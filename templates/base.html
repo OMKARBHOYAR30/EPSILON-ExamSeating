@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}EPSILON - Exam Seating System{% endblock %}</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+  
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <div class="app-container">
+    <!-- Left Navigation Panel -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-header">
+          <img src="{{ url_for('static', filename='images/logo.png') }}" alt="EPSILON Logo" class="sidebar-logo" onerror="this.src='https://via.placeholder.com/38/2563eb/ffffff?text=E'">
+          <div class="brand-info">
+            <span class="brand-title">EPSILON</span>
+            <span class="brand-subtitle">Product of Constant Technologies</span>
+          </div>
+        </div>
+
+        <nav class="nav-menu">
+          <a href="{{ url_for('dashboard') }}" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+            <i class="fa-solid fa-house"></i>
+            <span>Dashboard</span>
+          </a>
+          
+          <a href="{{ url_for('room_management') }}" class="nav-item {% if active_page == 'room_management' %}active{% endif %}">
+            <i class="fa-solid fa-building-columns"></i>
+            <span>Room Management</span>
+          </a>
+          
+          <a href="{{ url_for('student_management') }}" class="nav-item {% if active_page == 'student_management' %}active{% endif %}">
+            <i class="fa-solid fa-graduation-cap"></i>
+            <span>Student Management</span>
+          </a>
+          
+          <a href="{{ url_for('new_seating') }}" class="nav-item {% if active_page == 'new_seating' %}active{% endif %}">
+            <i class="fa-solid fa-users-rectangle"></i>
+            <span>New Seating Arrangement</span>
+          </a>
+          
+          <a href="{{ url_for('view_allocations') }}" class="nav-item {% if active_page == 'view_allocations' %}active{% endif %}">
+            <i class="fa-solid fa-table-list"></i>
+            <span>View Allocations</span>
+          </a>
+          
+          <a href="{{ url_for('block_report') }}" class="nav-item {% if active_page == 'block_report' %}active{% endif %}">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>Block Report</span>
+          </a>
+          
+          <a href="{{ url_for('allocation_summary') }}" class="nav-item {% if active_page == 'allocation_summary' %}active{% endif %}">
+            <i class="fa-solid fa-clipboard-list"></i>
+            <span>Allocation Summary</span>
+          </a>
+          
+          <div class="nav-divider"></div>
+          
+          <a href="{{ url_for('settings') }}" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+            <i class="fa-solid fa-gear"></i>
+            <span>Settings</span>
+          </a>
+          
+          <a href="{{ url_for('logout') }}" class="nav-item">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="product-badge">
+          <i class="fa-solid fa-shield-halved"></i>
+          <div class="product-text">
+            <strong>EPSILON ERP</strong>
+            <span>Constant Technologies</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="main-wrapper">
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-title-area">
+          <h2>{% block page_heading %}Dashboard{% endblock %}</h2>
+        </div>
+
+        <div class="header-right">
+          <div class="date-badge">
+            <i class="fa-regular fa-calendar"></i>
+            <span id="current_date_display">{{ current_date }}</span>
+          </div>
+
+          <div class="user-profile">
+            <div class="avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="user-info">
+              <span class="user-name">{{ session.get('username', 'HOST1') }}</span>
+              <span class="user-role">{{ session.get('role', 'Admin') }}</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Body Content -->
+      <main class="content-body">
+        <div class="page-container">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                  <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'danger' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %}"></i>
+                  <span>{{ message }}</span>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/room.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/allocation.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - EPSILON Exam Seating System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/forms.css') }}">
+  
+  <style>
+    body {
+      background: linear-gradient(135deg, #0b1d3a 0%, #162f56 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .login-box {
+      background: #ffffff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      padding: 2.5rem;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+    }
+    .login-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .login-logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      margin-bottom: 1rem;
+      border: 3px solid var(--primary);
+    }
+    .login-brand h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: 0.05em;
+    }
+    .login-brand p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="login-brand">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="EPSILON Logo" class="login-logo" onerror="this.src='https://via.placeholder.com/64/2563eb/ffffff?text=E'">
+      <h1>EPSILON</h1>
+      <p>Product of Constant Technologies</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form action="{{ url_for('login') }}" method="POST">
+      <div class="form-group">
+        <label for="username">Username / Host ID</label>
+        <input type="text" id="username" name="username" class="form-control" placeholder="e.g. HOST1" required autofocus value="HOST1">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required value="admin123">
+      </div>
+
+      <button type="submit" class="btn btn-primary login-btn">
+        <i class="fa-solid fa-right-to-bracket"></i> Sign In to Exam System
+      </button>
+    </form>
+  </div>
+</body>
+</html>

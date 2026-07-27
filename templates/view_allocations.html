@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}View Allocations - EPSILON{% endblock %}
+{% block page_heading %}Saved Exam Seating Allocations{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.15rem; font-weight: 700;">Seating Allocations Master Registry</h3>
+
+    <!-- Search box -->
+    <div style="width: 300px; position: relative;">
+      <input type="text" id="allocation_search" class="form-control" placeholder="Search Room, Block, Branch..." style="padding-left: 2.2rem;">
+      <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table" id="allocations_table">
+      <thead>
+        <tr>
+          <th>Allocation ID</th>
+          <th>Block</th>
+          <th>Room Number</th>
+          <th>Branch</th>
+          <th>Semester</th>
+          <th>Section</th>
+          <th>Bench Type</th>
+          <th>Capacity</th>
+          <th>Exam Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if allocations %}
+          {% for a in allocations %}
+            <tr>
+              <td><strong>#{{ a.id }}</strong></td>
+              <td>Block {{ a.block }}</td>
+              <td><span class="badge badge-primary">{{ a.room_no }}</span></td>
+              <td>
+                {% if a.bench_mode == 'DOUBLE' %}
+                  {{ a.left_branch }} / {{ a.right_branch }}
+                {% else %}
+                  {{ a.left_branch }}
+                {% endif %}
+              </td>
+              <td>Sem {{ a.left_semester }}</td>
+              <td>
+                {% if a.bench_mode == 'DOUBLE' %}
+                  {{ a.left_section }} & {{ a.right_section }}
+                {% else %}
+                  Sec {{ a.left_section }}
+                {% endif %}
+              </td>
+              <td>
+                {% if a.bench_mode == 'DOUBLE' %}
+                  <span class="badge badge-success">Double Side</span>
+                {% else %}
+                  <span class="badge badge-info">Left Side Only</span>
+                {% endif %}
+              </td>
+              <td><strong>{{ a.used_capacity }}</strong> seats</td>
+              <td><strong style="color: var(--primary);">{{ a.exam_date or a.created_at }}</strong></td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn-icon" title="View Bench Layout" onclick="openViewModal({{ a.id }})">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                  <a href="{{ url_for('delete_allocation_route', alloc_id=a.id) }}" class="btn-icon danger" title="Delete Allocation" onclick="return confirm('Are you sure you want to delete Allocation #{{ a.id }} for Room {{ a.room_no }}?');">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No seating allocations found. Click <a href="{{ url_for('new_seating') }}">New Seating Arrangement</a> to create one.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Seating Grid Preview Modal -->
+<div class="modal-overlay" id="viewDetailModal">
+  <div class="modal-box" style="max-width: 700px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="detailModalTitle"><i class="fa-solid fa-table-cells"></i> Allocation Details</h3>
+      <button type="button" class="btn-icon" onclick="closeViewModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" id="detailModalBody" style="max-height: 450px; overflow-y: auto;">
+      Loading allocation details...
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Table Live Filter Search
+  document.getElementById("allocation_search").addEventListener("keyup", function() {
+    const filter = this.value.toLowerCase();
+    const rows = document.querySelectorAll("#allocations_table tbody tr");
+    rows.forEach(r => {
+      const text = r.textContent.toLowerCase();
+      r.style.display = text.includes(filter) ? "" : "none";
+    });
+  });
+
+  function openViewModal(allocId) {
+    const modal = document.getElementById("viewDetailModal");
+    const body = document.getElementById("detailModalBody");
+    const title = document.getElementById("detailModalTitle");
+    modal.classList.add("active");
+    body.innerHTML = '<div style="text-align:center; padding:2rem;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i></div>';
+
+    fetch(`/api/allocation_detail/${allocId}`)
+      .then(res => res.json())
+      .then(data => {
+        title.textContent = `Allocation Details - Room ${data.room_no} (#${data.id})`;
+        let html = `
+          <div style="background:#f8fafc; padding:1rem; border-radius:8px; margin-bottom:1rem; font-size:0.88rem;">
+            <div><strong>Block:</strong> ${data.block} | <strong>Mode:</strong> ${data.bench_mode}</div>
+            <div><strong>Left Class:</strong> ${data.left_college} - ${data.left_branch} (Sem ${data.left_semester}, Sec ${data.left_section})</div>
+            ${data.bench_mode === 'DOUBLE' ? `<div><strong>Right Class:</strong> ${data.right_college} - ${data.right_branch} (Sem ${data.right_semester}, Sec ${data.right_section})</div>` : ''}
+          </div>
+          <h4 style="font-size:0.95rem; margin-bottom:0.5rem; font-weight:700;">Bench Seating Layout</h4>
+          <table class="table" style="font-size:0.85rem;">
+            <thead>
+              <tr>
+                <th>Bench No</th>
+                <th>Left Student</th>
+                <th>Right Student</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        data.seating_chart.forEach(b => {
+          html += `
+            <tr>
+              <td>Bench #${b.bench_no}</td>
+              <td><strong style="color:var(--primary);">${b.left_student || '-'}</strong></td>
+              <td><strong style="color:#059669;">${b.right_student || '-'}</strong></td>
+            </tr>
+          `;
+        });
+        html += `</tbody></table>`;
+        body.innerHTML = html;
+      });
+  }
+
+  function closeViewModal() {
+    document.getElementById("viewDetailModal").classList.remove("active");
+  }
+</script>
+{% endblock %}

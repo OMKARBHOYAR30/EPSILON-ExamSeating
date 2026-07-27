@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}New Seating Arrangement - EPSILON{% endblock %}
+{% block page_heading %}Create New Exam Seating Arrangement{% endblock %}
+
+{% block content %}
+<form action="{{ url_for('create_seating') }}" method="POST" id="seatingForm">
+
+  <!-- Step 1: Select Exam Date & Classroom -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">1</span>
+      Exam Date & Classroom Selection
+    </h3>
+
+    <div class="form-row">
+      <!-- Manual Exam Date Selection -->
+      <div class="form-group">
+        <label for="exam_date">Exam Date <span style="color:var(--danger);">*</span></label>
+        <input type="date" id="exam_date" name="exam_date" class="form-control" value="{{ default_exam_date }}" required>
+        <span class="form-hint">Set the date when the examination will take place.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="select_block">Select Block</label>
+        <select id="select_block" class="form-select" required>
+          <option value="">-- Select Block --</option>
+          {% for b in blocks %}
+            <option value="{{ b }}">Block {{ b }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="select_room">Choose Room</label>
+        <select id="select_room" name="room_no" class="form-select" required>
+          <option value="">-- Choose Block First --</option>
+        </select>
+        <input type="hidden" id="selected_block_input" name="block" value="">
+      </div>
+    </div>
+
+    <!-- Room Details Card -->
+    <div id="room_info_card" style="display: none; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1rem; border-radius: 10px; margin-top: 1rem;">
+      <div style="display: flex; gap: 2rem; align-items: center; font-size: 0.9rem;">
+        <div><strong>Total Capacity:</strong> <span id="room_capacity" style="color: var(--primary); font-weight: 700;">-</span> seats</div>
+        <div><strong>Total Rows:</strong> <span id="room_rows" style="font-weight: 700;">-</span></div>
+        <div><strong>Row Layout:</strong> <code id="room_layout_disp" style="font-size: 0.95rem;">-</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Seating Type Mode -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">2</span>
+      Choose Seating Type
+    </h3>
+
+    <div class="radio-group">
+      <label class="radio-card active">
+        <input type="radio" name="bench_mode" id="bench_mode_double" value="DOUBLE" checked>
+        <div>
+          <strong>Double Side Seating</strong>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">Allocates Left Student & Right Student on each bench</div>
+        </div>
+      </label>
+
+      <label class="radio-card">
+        <input type="radio" name="bench_mode" id="bench_mode_single" value="SINGLE">
+        <div>
+          <strong>Left Side Only</strong>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">Single student per bench (Skips Right Group form)</div>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <!-- Step 3: Left Group Details -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">3</span>
+      Left Group Details
+    </h3>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="left_college">College</label>
+        <input type="text" id="left_college" name="left_college" class="form-control" placeholder="e.g. GHRCE" required value="GHRCE">
+      </div>
+
+      <div class="form-group">
+        <label for="left_program">Program</label>
+        <input type="text" id="left_program" name="left_program" class="form-control" placeholder="e.g. B.Tech" required value="B.Tech">
+      </div>
+
+      <div class="form-group">
+        <label for="left_branch">Branch</label>
+        <input type="text" id="left_branch" name="left_branch" class="form-control" placeholder="e.g. CE" required value="CE">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="left_semester">Semester</label>
+        <input type="text" id="left_semester" name="left_semester" class="form-control" placeholder="e.g. 5" required value="5">
+      </div>
+
+      <div class="form-group">
+        <label for="left_section">Section</label>
+        <input type="text" id="left_section" name="left_section" class="form-control" placeholder="e.g. A" required value="A">
+      </div>
+    </div>
+
+    <!-- Roll Entry Selection Method -->
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+      <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
+      <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: var(--primary);">
+          <input type="radio" name="left_entry_mode" id="left_mode_dataset" value="dataset" checked> Student Master Database (Active Students)
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+          <input type="radio" name="left_entry_mode" id="left_mode_manual" value="manual"> Manual Roll Entry
+        </label>
+      </div>
+
+      <!-- Dataset Quick Select -->
+      <div id="left_dataset_inputs" style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+        <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">
+          Active Unallocated Students Count (Loaded from Master Database):
+        </label>
+        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setLeftDatasetCount(10)">First 10</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setLeftDatasetCount(15)">First 15</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setLeftDatasetCount(20)">First 20</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setLeftDatasetCount(30)">First 30</button>
+          <div style="display: flex; align-items: center; gap: 0.3rem; margin-left: 0.5rem;">
+            <span style="font-size: 0.85rem;">Count:</span>
+            <input type="number" id="left_dataset_count" name="left_dataset_count" class="form-control" style="width: 90px;" value="15" min="1" oninput="loadLeftDatasetPreview()">
+          </div>
+        </div>
+        <div style="font-size: 0.82rem; color: var(--primary); font-weight: 500;" id="left_dataset_preview_text">
+          Loading section roll list preview...
+        </div>
+      </div>
+
+      <!-- Manual inputs -->
+      <div id="left_manual_inputs" style="display: none; margin-top: 0.75rem;">
+        <div class="form-group">
+          <label>Enter Roll Numbers (Comma or Newline separated)</label>
+          <textarea name="left_manual_rolls" class="form-control" rows="3" placeholder="e.g. CE-101, CE-102, CE-105, CE-108"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Right Group Details (Skipped if Left Side Only) -->
+  <div class="card" id="right_group_container">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">4</span>
+      Right Group Details
+    </h3>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="right_college">College</label>
+        <input type="text" id="right_college" name="right_college" class="form-control" placeholder="e.g. GHRCE" value="GHRCE">
+      </div>
+
+      <div class="form-group">
+        <label for="right_program">Program</label>
+        <input type="text" id="right_program" name="right_program" class="form-control" placeholder="e.g. B.Tech" value="B.Tech">
+      </div>
+
+      <div class="form-group">
+        <label for="right_branch">Branch</label>
+        <input type="text" id="right_branch" name="right_branch" class="form-control" placeholder="e.g. IT" value="IT">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="right_semester">Semester</label>
+        <input type="text" id="right_semester" name="right_semester" class="form-control" placeholder="e.g. 5" value="5">
+      </div>
+
+      <div class="form-group">
+        <label for="right_section">Section</label>
+        <input type="text" id="right_section" name="right_section" class="form-control" placeholder="e.g. B" value="B">
+      </div>
+    </div>
+
+    <!-- Roll Entry Selection Method -->
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+      <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
+      <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #059669;">
+          <input type="radio" name="right_entry_mode" id="right_mode_dataset" value="dataset" checked> Student Master Database (Active Students)
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+          <input type="radio" name="right_entry_mode" id="right_mode_manual" value="manual"> Manual Roll Entry
+        </label>
+      </div>
+
+      <!-- Dataset Quick Select -->
+      <div id="right_dataset_inputs" style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+        <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">
+          Active Unallocated Students Count (Loaded from Master Database):
+        </label>
+        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setRightDatasetCount(10)">First 10</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setRightDatasetCount(15)">First 15</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setRightDatasetCount(20)">First 20</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setRightDatasetCount(30)">First 30</button>
+          <div style="display: flex; align-items: center; gap: 0.3rem; margin-left: 0.5rem;">
+            <span style="font-size: 0.85rem;">Count:</span>
+            <input type="number" id="right_dataset_count" name="right_dataset_count" class="form-control" style="width: 90px;" value="15" min="1" oninput="loadRightDatasetPreview()">
+          </div>
+        </div>
+        <div style="font-size: 0.82rem; color: #059669; font-weight: 500;" id="right_dataset_preview_text">
+          Loading section roll list preview...
+        </div>
+      </div>
+
+      <!-- Manual inputs -->
+      <div id="right_manual_inputs" style="display: none; margin-top: 0.75rem;">
+        <div class="form-group">
+          <label>Enter Roll Numbers (Comma or Newline separated)</label>
+          <textarea name="right_manual_rolls" class="form-control" rows="3" placeholder="e.g. IT-201, IT-202, IT-204, IT-207"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit Button -->
+  <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 2rem;">
+    <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 1rem;">
+      <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Seating Arrangement
+    </button>
+  </div>
+
+</form>
+
+<!-- Duplicate Room Modal -->
+<div class="modal-overlay" id="duplicateModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 class="modal-title" style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Duplicate Allocation Warning</h3>
+    </div>
+    <div class="modal-body">
+      This room already has a seating allocation for the selected date.
+      <br><br>
+      <strong>Do you want to create another allocation for this room on the same date?</strong>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" id="btnDuplicateNo">No</button>
+      <button type="button" class="btn btn-danger" id="btnDuplicateYes">Yes</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

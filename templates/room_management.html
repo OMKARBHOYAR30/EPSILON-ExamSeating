@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Room Management - EPSILON{% endblock %}
+{% block page_heading %}Classroom & Row Layout Management{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem;">
+  
+  <!-- Form: Add or Update Room -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <i class="fa-solid fa-plus-circle" style="color: var(--primary);"></i> Add / Update Room
+    </h3>
+
+    <form action="{{ url_for('save_room') }}" method="POST">
+      <div class="form-group">
+        <label for="block">Block Name</label>
+        <input type="text" id="block" name="block" class="form-control" placeholder="e.g. A, B, C" required>
+      </div>
+
+      <div class="form-group">
+        <label for="room_no">Room Number</label>
+        <input type="text" id="room_no" name="room_no" class="form-control" placeholder="e.g. A-101" required>
+      </div>
+
+      <div class="form-group">
+        <label for="row_layout">Row Layout (Comma-separated)</label>
+        <input type="text" id="row_layout" name="row_layout" class="form-control" placeholder="e.g. 10,9,10" required>
+        <span class="form-hint">Enter benches count per row. Example: <code>10,9,10</code></span>
+      </div>
+
+      <!-- Live Calculation Display -->
+      <div style="background-color: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; margin: 1rem 0; font-size: 0.88rem; font-weight: 600; color: var(--primary);">
+        <i class="fa-solid fa-calculator"></i> <span id="layout_calc_preview">Capacity = 0 | Rows = 0</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%;">
+        <i class="fa-solid fa-floppy-disk"></i> Save Classroom
+      </button>
+    </form>
+  </div>
+
+  <!-- Table: View Rooms -->
+  <div class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.1rem; font-weight: 700;">Classrooms Directory</h3>
+      
+      <!-- Block Filter -->
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Filter by Block:</label>
+        <select onchange="location = this.value;" class="form-select" style="width: 130px; padding: 0.35rem 0.6rem;">
+          <option value="{{ url_for('room_management') }}">All Blocks</option>
+          {% for b in blocks %}
+            <option value="{{ url_for('room_management', block=b) }}" {% if selected_block == b %}selected{% endif %}>Block {{ b }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Block</th>
+            <th>Room No.</th>
+            <th>Capacity</th>
+            <th>Rows</th>
+            <th>Row Layout</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if rooms %}
+            {% for r in rooms %}
+              <tr>
+                <td><strong>Block {{ r.block }}</strong></td>
+                <td><span class="badge badge-primary">{{ r.room_no }}</span></td>
+                <td><strong style="color: var(--primary);">{{ r.default_capacity }}</strong> seats</td>
+                <td>{{ r.default_rows }} rows</td>
+                <td><code>{{ r.default_row_layout }}</code></td>
+                <td>
+                  <a href="{{ url_for('delete_room_route', room_no=r.room_no) }}" class="btn-icon danger" title="Delete Room" onclick="return confirm('Are you sure you want to delete Room {{ r.room_no }}?');">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                No classrooms found. Add your first room using the form.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

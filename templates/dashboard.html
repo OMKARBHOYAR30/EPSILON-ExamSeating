@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - EPSILON Exam Seating System{% endblock %}
+{% block page_heading %}Exam Cell Operations Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-header-welcome">
+  <h1>Welcome, {{ session.get('username', 'HOST1') }}!</h1>
+  <p>Manage college exam seating arrangements easily and efficiently.</p>
+</div>
+
+<!-- 5 Large Action Cards -->
+<div class="action-cards-grid">
+  <!-- Card 1: Room Management -->
+  <div class="action-card">
+    <div class="action-icon-wrapper icon-blue">
+      <i class="fa-solid fa-building-columns"></i>
+    </div>
+    <h3>Room Management</h3>
+    <p>Add, edit, delete and view classrooms and block layouts.</p>
+    <a href="{{ url_for('room_management') }}" class="btn btn-primary btn-open">Open</a>
+  </div>
+
+  <!-- Card 2: New Seating Arrangement -->
+  <div class="action-card">
+    <div class="action-icon-wrapper icon-emerald">
+      <i class="fa-solid fa-users-rectangle"></i>
+    </div>
+    <h3>New Seating Arrangement</h3>
+    <p>Create a new seating arrangement for examinations.</p>
+    <a href="{{ url_for('new_seating') }}" class="btn btn-success btn-open">Open</a>
+  </div>
+
+  <!-- Card 3: View Allocations -->
+  <div class="action-card">
+    <div class="action-icon-wrapper icon-purple">
+      <i class="fa-solid fa-table-list"></i>
+    </div>
+    <h3>View Allocations</h3>
+    <p>Display all saved seating allocations.</p>
+    <a href="{{ url_for('view_allocations') }}" class="btn btn-primary btn-open" style="background-color: #9333ea;">Open</a>
+  </div>
+
+  <!-- Card 4: Block Report -->
+  <div class="action-card">
+    <div class="action-icon-wrapper icon-amber">
+      <i class="fa-solid fa-file-lines"></i>
+    </div>
+    <h3>Block Report</h3>
+    <p>Generate the classroom seating chart PDF.</p>
+    <a href="{{ url_for('block_report') }}" class="btn btn-primary btn-open" style="background-color: #d97706;">Open</a>
+  </div>
+
+  <!-- Card 5: Allocation Summary -->
+  <div class="action-card">
+    <div class="action-icon-wrapper icon-cyan">
+      <i class="fa-solid fa-clipboard-list"></i>
+    </div>
+    <h3>Allocation Summary</h3>
+    <p>Generate the master seating allocation PDF.</p>
+    <a href="{{ url_for('allocation_summary') }}" class="btn btn-primary btn-open" style="background-color: #0891b2;">Open</a>
+  </div>
+</div>
+
+<!-- Recent Allocations Table -->
+<div class="recent-allocations-card">
+  <div class="section-title-bar">
+    <h2>Recent Allocations</h2>
+    <a href="{{ url_for('view_allocations') }}" class="view-all-link">
+      View All Allocations <i class="fa-solid fa-arrow-right"></i>
+    </a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Room No.</th>
+          <th>Block</th>
+          <th>Left Group</th>
+          <th>Right Group</th>
+          <th>Bench Type</th>
+          <th>Exam Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if recent_allocations %}
+          {% for alloc in recent_allocations %}
+            <tr>
+              <td><strong>#{{ alloc.id }}</strong></td>
+              <td><span class="badge badge-primary">{{ alloc.room_no }}</span></td>
+              <td>{{ alloc.block }}</td>
+              <td>{{ alloc.left_college }} - {{ alloc.left_branch }} ({{ alloc.left_section }})</td>
+              <td>
+                {% if alloc.bench_mode == 'DOUBLE' %}
+                  {{ alloc.right_college }} - {{ alloc.right_branch }} ({{ alloc.right_section }})
+                {% else %}
+                  <span class="badge badge-secondary">None</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if alloc.bench_mode == 'DOUBLE' %}
+                  <span class="badge badge-success">Double Side</span>
+                {% else %}
+                  <span class="badge badge-info">Single Side</span>
+                {% endif %}
+              </td>
+              <td><strong style="color: var(--primary);">{{ alloc.exam_date or alloc.created_at }}</strong></td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No recent allocations created yet.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
