@@ -6,21 +6,49 @@
 {% block content %}
 <form action="{{ url_for('create_seating') }}" method="POST" id="seatingForm">
 
-  <!-- Step 1: Select Exam Date & Classroom -->
+  <!-- Step 1: Select Academic Year, Exam Selection, Exam Date & Classroom -->
   <div class="card">
     <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
       <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">1</span>
-      Exam Date & Classroom Selection
+      Exam Details & Classroom Selection
     </h3>
 
-    <div class="form-row">
+    <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+      <!-- Academic Year Selection -->
+      <div class="form-group">
+        <label for="academic_year">Academic Year <span style="color:var(--danger);">*</span></label>
+        <select id="academic_year" name="academic_year" class="form-select" required>
+          <option value="2026-2027" selected>2026-2027</option>
+          <option value="2025-2026">2025-2026</option>
+          <option value="2024-2025">2024-2025</option>
+          <option value="2027-2028">2027-2028</option>
+        </select>
+        <span class="form-hint">e.g. 2026-2027</span>
+      </div>
+
+      <!-- Exam Selection -->
+      <div class="form-group">
+        <label for="exam_name">Exam Type / Selection <span style="color:var(--danger);">*</span></label>
+        <select id="exam_name" name="exam_name" class="form-select" required>
+          <option value="CAE-I" selected>CAE-I</option>
+          <option value="CAE-II">CAE-II</option>
+          <option value="END SEMESTER">END SEMESTER</option>
+          <option value="MID SEMESTER">MID SEMESTER</option>
+          <option value="WINTER EXAM">WINTER EXAM</option>
+          <option value="SUMMER EXAM">SUMMER EXAM</option>
+        </select>
+        <span class="form-hint">e.g. CAE-I, CAE-II, END SEM</span>
+      </div>
+
       <!-- Manual Exam Date Selection -->
       <div class="form-group">
         <label for="exam_date">Exam Date <span style="color:var(--danger);">*</span></label>
         <input type="date" id="exam_date" name="exam_date" class="form-control" value="{{ default_exam_date }}" required>
-        <span class="form-hint">Set the date when the examination will take place.</span>
+        <span class="form-hint">Set the date for the exam.</span>
       </div>
+    </div>
 
+    <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
       <div class="form-group">
         <label for="select_block">Select Block</label>
         <select id="select_block" class="form-select" required>

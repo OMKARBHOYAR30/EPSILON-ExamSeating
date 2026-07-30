@@ -28,11 +28,17 @@ def init_db():
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         conn.executescript(f.read())
 
-    # Migration: Add exam_date column to allocations if missing
+    # Migration: Add missing columns to allocations table
     cur = conn.execute("PRAGMA table_info(allocations)")
     cols = [col["name"] for col in cur.fetchall()]
     if "exam_date" not in cols:
         conn.execute("ALTER TABLE allocations ADD COLUMN exam_date TEXT NOT NULL DEFAULT (date('now'))")
+        conn.commit()
+    if "academic_year" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN academic_year TEXT NOT NULL DEFAULT '2026-2027'")
+        conn.commit()
+    if "exam_name" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN exam_name TEXT NOT NULL DEFAULT 'CAE-I'")
         conn.commit()
 
     # Create performance indexes if missing
@@ -100,14 +106,14 @@ def init_db():
         tomorrow_str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         cur_alloc = conn.execute(
             """INSERT INTO allocations (
-                room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date,
+                room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name,
                 left_college, left_program, left_branch, left_semester, left_section,
                 left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
                 right_college, right_program, right_branch, right_semester, right_section,
                 right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                "A-101", "A", 30, 3, "10,10,10", "DOUBLE", tomorrow_str,
+                "A-101", "A", 30, 3, "10,10,10", "DOUBLE", tomorrow_str, "2026-2027", "CAE-I",
                 "GHRCE", "B.Tech", "CE", "5", "A", "CE-", 101, 130, "dataset",
                 "GHRCE", "B.Tech", "IT", "5", "B", "IT-", 201, 230, "dataset"
             )

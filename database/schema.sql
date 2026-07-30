@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS allocations (
     row_layout         TEXT NOT NULL,
     bench_mode         TEXT NOT NULL DEFAULT 'DOUBLE', -- 'DOUBLE' / 'SINGLE'
     exam_date          TEXT NOT NULL DEFAULT (date('now')), -- Manual Exam Date
+    academic_year      TEXT NOT NULL DEFAULT '2026-2027', -- Academic Year
+    exam_name          TEXT NOT NULL DEFAULT 'CAE-I',     -- Exam Name / Type
     
     -- Left Group
     left_college       TEXT NOT NULL,

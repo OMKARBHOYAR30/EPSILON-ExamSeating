@@ -2,7 +2,7 @@
 modules/allocation_manager.py
 ------------------------------
 Seating arrangement generation and allocation management module.
-Supports Student Master Database, Cross-Room Duplicate Allocation Prevention, and Manual Exam Date selection.
+Supports Student Master Database, Cross-Room Duplicate Allocation Prevention, Manual Exam Date, Academic Year, and Exam Name selection.
 """
 
 from datetime import datetime
@@ -112,7 +112,7 @@ def get_recent_allocations(limit=5):
     """Retrieve recent allocations for dashboard view."""
     db = get_db()
     allocations = db.execute(
-        """SELECT a.id, a.room_no, a.block, a.used_capacity, a.bench_mode, a.exam_date, a.created_at,
+        """SELECT a.id, a.room_no, a.block, a.used_capacity, a.bench_mode, a.exam_date, a.academic_year, a.exam_name, a.created_at,
                   a.left_college, a.left_branch, a.left_section,
                   a.right_college, a.right_branch, a.right_section
            FROM allocations a
@@ -155,13 +155,17 @@ def delete_allocation(allocation_id):
 def create_seating_allocation(data):
     """
     Creates a new seating allocation and populates bench-by-bench seating chart.
-    `data` dictionary contains all form fields including exam_date.
+    `data` dictionary contains all form fields including exam_date, academic_year, exam_name.
     Automatically prevents duplicate allocations across rooms on the same exam date.
     """
     room_no = data.get("room_no")
     block = data.get("block")
     bench_mode = data.get("bench_mode", "DOUBLE")  # DOUBLE or SINGLE
     
+    # Academic Year & Exam Selection
+    academic_year = data.get("academic_year", "2026-2027").strip() or "2026-2027"
+    exam_name = data.get("exam_name", "CAE-I").strip() or "CAE-I"
+
     # Manual Exam Date selection
     exam_date = data.get("exam_date", "").strip()
     if not exam_date:
@@ -204,13 +208,11 @@ def create_seating_allocation(data):
     elif left_entry_mode == "manual":
         raw_manual = data.get("left_manual_rolls", "")
         parsed = [r.strip() for r in raw_manual.replace("\n", ",").split(",") if r.strip()]
-        # Exclude already allocated roll numbers for cross-room duplicate prevention
         left_students = [r for r in parsed if r not in already_allocated_rolls]
         left_roll_prefix = "MANUAL"
         left_roll_from = 1
         left_roll_to = len(left_students)
     else:
-        # Fallback auto range
         left_roll_prefix = data.get("left_roll_prefix", "")
         left_roll_from = int(data.get("left_roll_from", 1))
         left_roll_to = int(data.get("left_roll_to", total_benches))
@@ -269,14 +271,14 @@ def create_seating_allocation(data):
     # Insert into allocations table
     cur = db.execute(
         """INSERT INTO allocations (
-            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date,
+            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name,
             left_college, left_program, left_branch, left_semester, left_section,
             left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
             right_college, right_program, right_branch, right_semester, right_section,
             right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date,
+            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name,
             left_college, left_program, left_branch, left_semester, left_section,
             left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
             right_college, right_program, right_branch, right_semester, right_section,
@@ -305,4 +307,4 @@ def create_seating_allocation(data):
     db.commit()
     db.close()
 
-    return True, f"Seating arrangement for Room {room_no} generated successfully for Exam Date: {exam_date}! (Duplicate student allocations prevented)", allocation_id
+    return True, f"Seating arrangement for Room {room_no} generated successfully for {exam_name} ({academic_year})!", allocation_id

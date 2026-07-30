@@ -3,11 +3,10 @@ modules/block_report.py
 ------------------------
 ReportLab notice-board style student seating chart PDF generator for a room.
 Saves PDF to generated_reports/Block_Report.pdf (and generated_reports/Block_<RoomNo>.pdf).
-Uses the manual Exam Date selected for the allocation.
+Formats header according to University specification with Academic Year & Exam Selection, without date display.
 """
 
 import os
-from datetime import datetime, date
 from database.db import get_db
 
 from reportlab.lib.pagesizes import A3, landscape
@@ -40,12 +39,10 @@ def generate_block_report(allocation_id=None):
     row_layout = allocation["row_layout"]
     bench_mode = allocation["bench_mode"]
 
-    exam_date_raw = allocation["exam_date"] if ("exam_date" in allocation.keys() and allocation["exam_date"]) else date.today().strftime("%Y-%m-%d")
-    try:
-        exam_date_formatted = datetime.strptime(exam_date_raw, "%Y-%m-%d").strftime("%d/%m/%Y")
-    except Exception:
-        exam_date_formatted = exam_date_raw
+    academic_year = allocation["academic_year"] if ("academic_year" in allocation.keys() and allocation["academic_year"]) else "2026-2027"
+    exam_name = allocation["exam_name"] if ("exam_name" in allocation.keys() and allocation["exam_name"]) else "CAE-I"
 
+    left_college = allocation["left_college"] or "GHRCE"
     left_section = allocation["left_section"]
     left_branch = allocation["left_branch"]
     left_semester = allocation["left_semester"]
@@ -53,6 +50,7 @@ def generate_block_report(allocation_id=None):
     left_roll_from = allocation["left_roll_from"] or ""
     left_roll_to = allocation["left_roll_to"] or ""
 
+    right_college = allocation["right_college"] or ""
     right_section = allocation["right_section"] or ""
     right_branch = allocation["right_branch"] or ""
     right_semester = allocation["right_semester"] or ""
@@ -84,20 +82,41 @@ def generate_block_report(allocation_id=None):
     width, height = page_size
 
     def draw_content():
-        y = height - 40
+        y = height - 35
 
-        # Title
-        pdf.setFont("Helvetica-Bold", 20)
+        # Header Line 1: University Name
+        pdf.setFont("Helvetica-Bold", 15)
+        pdf.drawCentredString(width / 2, y, "GH RAISONI SKILL TECH UNIVERSITY")
+
+        # Header Line 2: School / Institution Name
+        y -= 18
+        pdf.setFont("Helvetica", 11)
+        pdf.drawCentredString(width / 2, y, "School of Engineering Technology")
+
+        # Header Line 3: Department / Programs Description
+        y -= 16
+        dept_str = f"{left_branch}"
+        if bench_mode == "DOUBLE" and right_branch and right_branch != left_branch:
+            dept_str += f" / {right_branch}"
+        pdf.drawCentredString(width / 2, y, f"Department of {dept_str}")
+
+        # Header Line 4: Exam Selection & Academic Year
+        y -= 16
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawCentredString(width / 2, y, f"{exam_name} ({academic_year})")
+
+        # Header Line 5: Main Chart Title
+        y -= 20
+        pdf.setFont("Helvetica-Bold", 14)
         pdf.drawCentredString(width / 2, y, "STUDENT SEATING ARRANGEMENT CHART")
 
-        y -= 35
-
-        # Sub-header
-        pdf.setFont("Helvetica-Bold", 13)
-        pdf.drawString(40, y, f"Room No. {room_no}")
-        pdf.drawRightString(width - 40, y, f"Date - {exam_date_formatted}")
-
         y -= 25
+
+        # Room No sub-header (NO DATE DISPLAY as requested)
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(40, y, f"Room No. {room_no}")
+
+        y -= 20
 
         # Summary info table
         left_label = f"{left_section}/{left_branch}/{left_semester}"
@@ -136,7 +155,7 @@ def generate_block_report(allocation_id=None):
         _, table_height = info_table.wrapOn(pdf, width, height)
         info_table.drawOn(pdf, 40, y - table_height)
 
-        y = y - table_height - 30
+        y = y - table_height - 25
 
         # Main seating table grid
         num_groups = len(grouped_benches)
