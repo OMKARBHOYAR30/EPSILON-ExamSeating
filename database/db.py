@@ -28,6 +28,13 @@ def init_db():
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         conn.executescript(f.read())
 
+    # Migration: Add missing columns to section_students table
+    cur = conn.execute("PRAGMA table_info(section_students)")
+    sec_cols = [col["name"] for col in cur.fetchall()]
+    if "open_elective" not in sec_cols:
+        conn.execute("ALTER TABLE section_students ADD COLUMN open_elective TEXT DEFAULT ''")
+        conn.commit()
+
     # Migration: Add missing columns to allocations table
     cur = conn.execute("PRAGMA table_info(allocations)")
     cols = [col["name"] for col in cur.fetchall()]
@@ -40,9 +47,19 @@ def init_db():
     if "exam_name" not in cols:
         conn.execute("ALTER TABLE allocations ADD COLUMN exam_name TEXT NOT NULL DEFAULT 'CAE-I'")
         conn.commit()
+    if "allocation_type" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN allocation_type TEXT NOT NULL DEFAULT 'SECTION'")
+        conn.commit()
+    if "left_oe_subject" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN left_oe_subject TEXT DEFAULT ''")
+        conn.commit()
+    if "right_oe_subject" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN right_oe_subject TEXT DEFAULT ''")
+        conn.commit()
 
-    # Create performance indexes if missing
+    # Create performance indexes after column migrations
     conn.execute("CREATE INDEX IF NOT EXISTS idx_section_students_sec ON section_students(college, branch, semester, section, is_active)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_section_students_oe ON section_students(semester, open_elective, is_active)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_section_students_roll ON section_students(roll_no)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_allocations_date ON allocations(exam_date, room_no)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_seating_chart_alloc ON seating_chart(allocation_id)")
@@ -78,62 +95,27 @@ def init_db():
             )
         conn.commit()
 
-    # Seed sample section_students dataset if empty (includes dropped student gaps)
+    # Seed sample section_students dataset if empty (includes OE subjects)
     cur = conn.execute("SELECT COUNT(*) AS c FROM section_students")
     if cur.fetchone()["c"] == 0:
-        # CE - Sem 5 - Sec A (active roll numbers with gaps for dropped students)
+        # CE - Sem 5 - Sec A
         ce_rolls = [r for r in range(101, 140) if r not in (104, 107, 110, 115, 122)]
-        for r in ce_rolls:
+        for i, r in enumerate(ce_rolls):
+            oe = "IPR" if i < 15 else "Industry 4.0"
             conn.execute(
-                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                ("GHRCE", "B.Tech", "CE", "5", "A", f"CE-{r}", f"Student CE-{r}")
+                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("GHRCE", "B.Tech", "CE", "5", "A", f"CE-{r}", f"Student CE-{r}", oe)
             )
 
-        # IT - Sem 5 - Sec B (active roll numbers with gaps for dropped students)
+        # IT - Sem 5 - Sec B
         it_rolls = [r for r in range(201, 240) if r not in (203, 208, 214, 219, 225)]
-        for r in it_rolls:
+        for i, r in enumerate(it_rolls):
+            oe = "IPR" if i < 12 else "Cyber Security"
             conn.execute(
-                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                ("GHRCE", "B.Tech", "IT", "5", "B", f"IT-{r}", f"Student IT-{r}")
-            )
-        conn.commit()
-
-    # Seed sample allocation if empty
-    cur = conn.execute("SELECT COUNT(*) AS c FROM allocations")
-    if cur.fetchone()["c"] == 0:
-        tomorrow_str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        cur_alloc = conn.execute(
-            """INSERT INTO allocations (
-                room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name,
-                left_college, left_program, left_branch, left_semester, left_section,
-                left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
-                right_college, right_program, right_branch, right_semester, right_section,
-                right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                "A-101", "A", 30, 3, "10,10,10", "DOUBLE", tomorrow_str, "2026-2027", "CAE-I",
-                "GHRCE", "B.Tech", "CE", "5", "A", "CE-", 101, 130, "dataset",
-                "GHRCE", "B.Tech", "IT", "5", "B", "IT-", 201, 230, "dataset"
-            )
-        )
-        alloc_id = cur_alloc.lastrowid
-        # Fetch active rolls for CE Sec A and IT Sec B
-        ce_active = [r["roll_no"] for r in conn.execute(
-            "SELECT roll_no FROM section_students WHERE branch='CE' AND semester='5' AND section='A' ORDER BY id LIMIT 30"
-        ).fetchall()]
-        it_active = [r["roll_no"] for r in conn.execute(
-            "SELECT roll_no FROM section_students WHERE branch='IT' AND semester='5' AND section='B' ORDER BY id LIMIT 30"
-        ).fetchall()]
-
-        for b in range(1, 31):
-            l_s = ce_active[b - 1] if b <= len(ce_active) else ""
-            r_s = it_active[b - 1] if b <= len(it_active) else ""
-            conn.execute(
-                """INSERT INTO seating_chart (allocation_id, bench_no, left_student, right_student, room_no)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (alloc_id, b, l_s, r_s, "A-101")
+                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("GHRCE", "B.Tech", "IT", "5", "B", f"IT-{r}", f"Student IT-{r}", oe)
             )
         conn.commit()
 

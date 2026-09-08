@@ -2,7 +2,7 @@
 modules/allocation_manager.py
 ------------------------------
 Seating arrangement generation and allocation management module.
-Supports Student Master Database, Cross-Room Duplicate Allocation Prevention, Manual Exam Date, Academic Year, and Exam Name selection.
+Supports Student Master Database, Open Elective (OE) Classroom Allocation, Cross-Room Duplicate Prevention, Manual Exam Date, Academic Year, and Exam Selection.
 """
 
 from datetime import datetime
@@ -57,10 +57,39 @@ def get_section_students(branch, semester, section, limit=None, college="GHRCE",
     """
     db = get_db()
     rows = db.execute(
-        """SELECT roll_no, student_name, is_active FROM section_students 
+        """SELECT roll_no, student_name, branch, section, open_elective, is_active FROM section_students 
            WHERE branch = ? AND semester = ? AND section = ? AND is_active = 1 
            ORDER BY id""",
         (branch, semester, section)
+    ).fetchall()
+    db.close()
+
+    all_students = [dict(r) for r in rows]
+
+    if exam_date and exclude_allocated:
+        allocated_rolls = get_allocated_students_by_date(exam_date)
+        filtered = [s for s in all_students if s["roll_no"] not in allocated_rolls]
+    else:
+        filtered = all_students
+
+    if limit and int(limit) > 0:
+        filtered = filtered[:int(limit)]
+
+    return filtered
+
+
+def get_oe_students(semester, open_elective, limit=None, exam_date=None, exclude_allocated=True):
+    """
+    Retrieve active students enrolled in a specific Open Elective (OE) subject across ALL colleges, branches, and sections.
+    If `exam_date` is provided and `exclude_allocated=True`, excludes students already allocated on that date.
+    """
+    db = get_db()
+    rows = db.execute(
+        """SELECT roll_no, student_name, branch, section, open_elective, college, program, semester, is_active 
+           FROM section_students 
+           WHERE semester = ? AND open_elective = ? AND is_active = 1 
+           ORDER BY branch, section, roll_no""",
+        (str(semester), str(open_elective))
     ).fetchall()
     db.close()
 
@@ -112,9 +141,9 @@ def get_recent_allocations(limit=5):
     """Retrieve recent allocations for dashboard view."""
     db = get_db()
     allocations = db.execute(
-        """SELECT a.id, a.room_no, a.block, a.used_capacity, a.bench_mode, a.exam_date, a.academic_year, a.exam_name, a.created_at,
-                  a.left_college, a.left_branch, a.left_section,
-                  a.right_college, a.right_branch, a.right_section
+        """SELECT a.id, a.room_no, a.block, a.used_capacity, a.bench_mode, a.exam_date, a.academic_year, a.exam_name, a.allocation_type, a.created_at,
+                  a.left_college, a.left_branch, a.left_section, a.left_oe_subject,
+                  a.right_college, a.right_branch, a.right_section, a.right_oe_subject
            FROM allocations a
            ORDER BY a.id DESC LIMIT ?""",
         (limit,)
@@ -155,12 +184,12 @@ def delete_allocation(allocation_id):
 def create_seating_allocation(data):
     """
     Creates a new seating allocation and populates bench-by-bench seating chart.
-    `data` dictionary contains all form fields including exam_date, academic_year, exam_name.
-    Automatically prevents duplicate allocations across rooms on the same exam date.
+    Supports both Section Allocation and Open Elective (OE) Classroom Allocation.
     """
     room_no = data.get("room_no")
     block = data.get("block")
     bench_mode = data.get("bench_mode", "DOUBLE")  # DOUBLE or SINGLE
+    allocation_type = data.get("allocation_type", "SECTION")  # 'SECTION' or 'OE'
     
     # Academic Year & Exam Selection
     academic_year = data.get("academic_year", "2026-2027").strip() or "2026-2027"
@@ -191,6 +220,7 @@ def create_seating_allocation(data):
     left_branch = data.get("left_branch", "")
     left_semester = data.get("left_semester", "")
     left_section = data.get("left_section", "")
+    left_oe_subject = data.get("left_oe_subject", "").strip()
     left_entry_mode = data.get("left_entry_mode", "dataset")
 
     left_students = []
@@ -198,7 +228,18 @@ def create_seating_allocation(data):
     left_roll_from = 0
     left_roll_to = 0
 
-    if left_entry_mode == "dataset":
+    if left_entry_mode == "oe":
+        count = int(data.get("left_dataset_count", total_benches))
+        student_rows = get_oe_students(left_semester, left_oe_subject, limit=count, exam_date=exam_date, exclude_allocated=True)
+        left_students = [s["roll_no"] for s in student_rows]
+        left_roll_prefix = f"OE-{left_oe_subject}"
+        left_roll_from = 1
+        left_roll_to = len(left_students)
+        if not left_branch:
+            left_branch = f"OE ({left_oe_subject})"
+        if not left_section:
+            left_section = "ALL"
+    elif left_entry_mode == "dataset":
         count = int(data.get("left_dataset_count", total_benches))
         student_rows = get_section_students(left_branch, left_semester, left_section, count, college=left_college, exam_date=exam_date, exclude_allocated=True)
         left_students = [s["roll_no"] for s in student_rows]
@@ -229,6 +270,7 @@ def create_seating_allocation(data):
     right_branch = ""
     right_semester = ""
     right_section = ""
+    right_oe_subject = ""
     right_roll_prefix = ""
     right_roll_from = 0
     right_roll_to = 0
@@ -241,9 +283,21 @@ def create_seating_allocation(data):
         right_branch = data.get("right_branch", "")
         right_semester = data.get("right_semester", "")
         right_section = data.get("right_section", "")
+        right_oe_subject = data.get("right_oe_subject", "").strip()
         right_entry_mode = data.get("right_entry_mode", "dataset")
 
-        if right_entry_mode == "dataset":
+        if right_entry_mode == "oe":
+            r_count = int(data.get("right_dataset_count", total_benches))
+            r_student_rows = get_oe_students(right_semester, right_oe_subject, limit=r_count, exam_date=exam_date, exclude_allocated=True)
+            right_students = [s["roll_no"] for s in r_student_rows if s["roll_no"] not in already_allocated_rolls]
+            right_roll_prefix = f"OE-{right_oe_subject}"
+            right_roll_from = 1
+            right_roll_to = len(right_students)
+            if not right_branch:
+                right_branch = f"OE ({right_oe_subject})"
+            if not right_section:
+                right_section = "ALL"
+        elif right_entry_mode == "dataset":
             r_count = int(data.get("right_dataset_count", total_benches))
             r_student_rows = get_section_students(right_branch, right_semester, right_section, r_count, college=right_college, exam_date=exam_date, exclude_allocated=True)
             right_students = [s["roll_no"] for s in r_student_rows if s["roll_no"] not in already_allocated_rolls]
@@ -271,17 +325,17 @@ def create_seating_allocation(data):
     # Insert into allocations table
     cur = db.execute(
         """INSERT INTO allocations (
-            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name,
-            left_college, left_program, left_branch, left_semester, left_section,
+            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name, allocation_type,
+            left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
             left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
-            right_college, right_program, right_branch, right_semester, right_section,
+            right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
             right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name,
-            left_college, left_program, left_branch, left_semester, left_section,
+            room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name, allocation_type,
+            left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
             left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
-            right_college, right_program, right_branch, right_semester, right_section,
+            right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
             right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
         )
     )

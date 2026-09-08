@@ -1,11 +1,11 @@
-# """
-# app.py
-# ------
-# EPSILON - Exam Seating Arrangement Management System
-# Developed by Constant Technologies
+"""
+app.py
+------
+EPSILON - Exam Seating Arrangement Management System
+Developed by Constant Technologies
 
-# Main Flask Application Entry Point
-# """
+Main Flask Application Entry Point
+"""
 
 import os
 from datetime import datetime, timedelta
@@ -15,14 +15,14 @@ from database.db import init_db, get_db
 from modules.login_manager import authenticate_user, change_user_password
 from modules.room_manager import get_all_rooms, get_rooms_by_block, get_blocks, add_room, delete_room, get_room_details
 from modules.student_manager import (
-    get_all_student_sections, get_students_filtered, get_students_for_section,
+    get_all_student_sections, get_available_oe_subjects, get_students_filtered, get_students_for_section,
     add_single_student, add_section_students, import_students_from_excel,
     update_student, toggle_student_status, delete_student, delete_section_dataset
 )
 from modules.allocation_manager import (
     create_seating_allocation, get_all_allocations, get_recent_allocations,
     get_allocation_by_id, delete_allocation, check_existing_allocation,
-    get_available_sections, get_section_students, get_allocated_students_by_date
+    get_available_sections, get_section_students, get_oe_students, get_allocated_students_by_date
 )
 from modules.report_manager import generate_all_reports, get_report_filepath
 from modules.block_report import generate_block_report
@@ -166,15 +166,18 @@ def student_management():
     branch_filter = request.args.get("branch", "").strip()
     semester_filter = request.args.get("semester", "").strip()
     section_filter = request.args.get("section", "").strip()
+    oe_filter = request.args.get("open_elective", "").strip()
     search_query = request.args.get("search", "").strip()
     active_filter = request.args.get("is_active", "").strip()
 
     datasets = get_all_student_sections()
+    oe_subjects = get_available_oe_subjects()
     students = get_students_filtered(
         college=college_filter,
         branch=branch_filter,
         semester=semester_filter,
         section=section_filter,
+        open_elective=oe_filter,
         search=search_query,
         is_active=active_filter
     )
@@ -184,10 +187,12 @@ def student_management():
         active_page="student_management",
         datasets=datasets,
         students=students,
+        oe_subjects=oe_subjects,
         college_filter=college_filter,
         branch_filter=branch_filter,
         semester_filter=semester_filter,
         section_filter=section_filter,
+        oe_filter=oe_filter,
         search_query=search_query,
         active_filter=active_filter
     )
@@ -202,10 +207,11 @@ def save_section_students_route():
     semester = request.form.get("semester")
     section = request.form.get("section")
     rolls_text = request.form.get("rolls_text", "")
+    default_open_elective = request.form.get("default_open_elective", "")
     mode = request.form.get("save_mode", "replace")  # 'replace' or 'append'
 
     replace_existing = (mode == "replace")
-    success, msg = add_section_students(college, program, branch, semester, section, rolls_text, replace_existing=replace_existing)
+    success, msg = add_section_students(college, program, branch, semester, section, rolls_text, default_open_elective=default_open_elective, replace_existing=replace_existing)
     if success:
         flash(msg, "success")
     else:
@@ -227,6 +233,7 @@ def import_students_excel_route():
     default_branch = request.form.get("default_branch", "")
     default_semester = request.form.get("default_semester", "")
     default_section = request.form.get("default_section", "")
+    default_oe = request.form.get("default_oe", "")
 
     success, msg = import_students_from_excel(
         file,
@@ -234,7 +241,8 @@ def import_students_excel_route():
         default_program=default_program,
         default_branch=default_branch,
         default_semester=default_semester,
-        default_section=default_section
+        default_section=default_section,
+        default_oe=default_oe
     )
 
     if success:
@@ -255,9 +263,10 @@ def add_single_student_route():
     section = request.form.get("section")
     roll_no = request.form.get("roll_no")
     student_name = request.form.get("student_name", "")
+    open_elective = request.form.get("open_elective", "")
     is_active = request.form.get("is_active", 1)
 
-    success, msg = add_single_student(college, program, branch, semester, section, roll_no, student_name, is_active)
+    success, msg = add_single_student(college, program, branch, semester, section, roll_no, student_name, open_elective=open_elective, is_active=is_active)
     if success:
         flash(msg, "success")
     else:
@@ -277,9 +286,10 @@ def edit_student_route():
     section = request.form.get("section")
     roll_no = request.form.get("roll_no")
     student_name = request.form.get("student_name", "")
+    open_elective = request.form.get("open_elective", "")
     is_active = request.form.get("is_active", 1)
 
-    success, msg = update_student(student_id, roll_no, student_name, college, program, branch, semester, section, is_active)
+    success, msg = update_student(student_id, roll_no, student_name, college, program, branch, semester, section, open_elective, is_active)
     if success:
         flash(msg, "success")
     else:
@@ -335,7 +345,8 @@ def delete_section_dataset_route():
 def new_seating():
     blocks = get_blocks()
     sections = get_available_sections()
-    return render_template("new_seating.html", active_page="new_seating", blocks=blocks, sections=sections)
+    oe_subjects = get_available_oe_subjects()
+    return render_template("new_seating.html", active_page="new_seating", blocks=blocks, sections=sections, oe_subjects=oe_subjects)
 
 
 @app.route("/create_seating", methods=["POST"])
@@ -394,6 +405,28 @@ def api_get_section_students():
     })
 
 
+@app.route("/api/get_oe_students")
+@login_required
+def api_get_oe_students():
+    semester = request.args.get("semester", "").strip()
+    open_elective = request.args.get("open_elective", "").strip()
+    exam_date = request.args.get("exam_date", "").strip()
+    limit = request.args.get("limit", 0)
+
+    all_active = get_oe_students(semester, open_elective, limit=None, exam_date=None, exclude_allocated=False)
+    unallocated = get_oe_students(semester, open_elective, limit=limit, exam_date=exam_date, exclude_allocated=True)
+
+    already_allocated_set = get_allocated_students_by_date(exam_date)
+    allocated_count = len([s for s in all_active if s["roll_no"] in already_allocated_set])
+
+    return jsonify({
+        "students": unallocated,
+        "total_active": len(all_active),
+        "total_unallocated": len(unallocated),
+        "total_already_allocated": allocated_count
+    })
+
+
 @app.route("/api/search_students")
 @login_required
 def api_search_students():
@@ -401,10 +434,11 @@ def api_search_students():
     branch = request.args.get("branch", "").strip()
     semester = request.args.get("semester", "").strip()
     section = request.args.get("section", "").strip()
+    open_elective = request.args.get("open_elective", "").strip()
     search = request.args.get("search", "").strip()
     is_active = request.args.get("is_active", "").strip()
 
-    students = get_students_filtered(college, branch, semester, section, search, is_active)
+    students = get_students_filtered(college, branch, semester, section, open_elective, search, is_active)
     return jsonify({"students": students, "total": len(students)})
 
 

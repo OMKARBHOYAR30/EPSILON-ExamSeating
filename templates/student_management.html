@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Student Master Database Management - EPSILON{% endblock %}
-{% block page_heading %}Student Master Database & Section Management{% endblock %}
+{% block page_heading %}Student Master Database & Open Elective (OE) Management{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -73,6 +73,17 @@
     background: #f1f5f9;
     border-color: var(--primary, #2563eb);
   }
+  .badge-oe {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    font-size: 0.78rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
 </style>
 {% endblock %}
 
@@ -129,9 +140,14 @@
           </div>
 
           <div class="form-group">
+            <label for="m_oe">Default Open Elective (OE) Subject</label>
+            <input type="text" id="m_oe" name="default_open_elective" class="form-control" placeholder="e.g. IPR or Industry 4.0">
+            <span class="form-hint">Applies to students entered below (or format: Roll, Name, OE)</span>
+          </div>
+
+          <div class="form-group">
             <label for="rolls_text">Type / Paste Roll Numbers</label>
-            <textarea id="rolls_text" name="rolls_text" class="form-control" rows="7" placeholder="Type roll numbers separated by comma or new line:&#10;CE-101, CE-102, CE-103&#10;OR formatted:&#10;CE-105: John Doe&#10;CE-106: Jane Smith" required></textarea>
-            <span class="form-hint">Note: Missing or left students are automatically excluded when not entered!</span>
+            <textarea id="rolls_text" name="rolls_text" class="form-control" rows="6" placeholder="Type roll numbers:&#10;CE-101, CE-102, CE-103&#10;OR with OE subject:&#10;CE-101, John Doe, IPR&#10;CE-102, Jane Smith, Industry 4.0" required></textarea>
           </div>
 
           <div class="form-group" style="margin-top: 0.5rem;">
@@ -159,7 +175,7 @@
             <i class="fa-solid fa-file-excel fa-2x" style="color: #16a34a; margin-bottom: 0.5rem;"></i>
             <div style="font-weight: 600; font-size: 0.9rem;">Click to select Excel file (.xlsx, .csv)</div>
             <div id="file-name-display" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-              Supports columns: Roll No, Name, College, Branch, Semester, Section
+              Columns: Roll No, Name, Branch, Sem, Sec, <strong>Open Elective</strong>
             </div>
             <input type="file" id="excel_file" name="excel_file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="updateFileName(this)" required>
           </div>
@@ -191,6 +207,11 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label>Default Open Elective (OE)</label>
+            <input type="text" name="default_oe" class="form-control" placeholder="e.g. IPR">
+          </div>
+
           <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.75rem; background: #16a34a; border-color: #16a34a;">
             <i class="fa-solid fa-upload"></i> Upload & Import File
           </button>
@@ -212,6 +233,11 @@
           <div class="form-group">
             <label for="s_student_name">Full Name</label>
             <input type="text" id="s_student_name" name="student_name" class="form-control" placeholder="e.g. Rahul Sharma">
+          </div>
+
+          <div class="form-group">
+            <label for="s_open_elective">Open Elective (OE) Subject</label>
+            <input type="text" id="s_open_elective" name="open_elective" class="form-control" placeholder="e.g. IPR or Industry 4.0">
           </div>
 
           <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
@@ -288,15 +314,22 @@
     <!-- Filters & Search Toolbar -->
     <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
       <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; flex: 1;">
-        <input type="text" id="filter_search" class="form-control" style="max-width: 220px;" placeholder="Search Roll No / Name..." value="{{ search_query }}" onkeyup="triggerLiveSearch()">
+        <input type="text" id="filter_search" class="form-control" style="max-width: 200px;" placeholder="Search Roll / Name / OE..." value="{{ search_query }}" onkeyup="triggerLiveSearch()">
         
-        <input type="text" id="filter_branch" class="form-control" style="max-width: 100px;" placeholder="Branch" value="{{ branch_filter }}" onchange="triggerLiveSearch()">
+        <input type="text" id="filter_branch" class="form-control" style="max-width: 90px;" placeholder="Branch" value="{{ branch_filter }}" onchange="triggerLiveSearch()">
         
-        <input type="text" id="filter_sem" class="form-control" style="max-width: 80px;" placeholder="Sem" value="{{ semester_filter }}" onchange="triggerLiveSearch()">
+        <input type="text" id="filter_sem" class="form-control" style="max-width: 70px;" placeholder="Sem" value="{{ semester_filter }}" onchange="triggerLiveSearch()">
         
-        <input type="text" id="filter_sec" class="form-control" style="max-width: 80px;" placeholder="Sec" value="{{ section_filter }}" onchange="triggerLiveSearch()">
+        <input type="text" id="filter_sec" class="form-control" style="max-width: 70px;" placeholder="Sec" value="{{ section_filter }}" onchange="triggerLiveSearch()">
 
-        <select id="filter_active" class="form-select" style="max-width: 130px;" onchange="triggerLiveSearch()">
+        <select id="filter_oe" class="form-select" style="max-width: 150px;" onchange="triggerLiveSearch()">
+          <option value="">All OE Subjects</option>
+          {% for oe in oe_subjects %}
+            <option value="{{ oe.open_elective }}" {% if oe_filter == oe.open_elective %}selected{% endif %}>{{ oe.open_elective }} (Sem {{ oe.semester }})</option>
+          {% endfor %}
+        </select>
+
+        <select id="filter_active" class="form-select" style="max-width: 120px;" onchange="triggerLiveSearch()">
           <option value="" {% if active_filter == '' %}selected{% endif %}>All Status</option>
           <option value="1" {% if active_filter == '1' %}selected{% endif %}>Active Only</option>
           <option value="0" {% if active_filter == '0' %}selected{% endif %}>Left / Dropped</option>
@@ -324,6 +357,7 @@
             <th>Roll Number</th>
             <th>Student Name</th>
             <th>Class Section</th>
+            <th>Open Elective (OE)</th>
             <th>College / Program</th>
             <th>Status</th>
             <th>Actions</th>
@@ -336,6 +370,13 @@
                 <td><strong style="color: var(--primary);">{{ s.roll_no }}</strong></td>
                 <td>{{ s.student_name or '-' }}</td>
                 <td><span class="badge badge-secondary">{{ s.branch }} - Sem {{ s.semester }} (Sec {{ s.section }})</span></td>
+                <td>
+                  {% if s.open_elective %}
+                    <span class="badge-oe"><i class="fa-solid fa-book-open"></i> {{ s.open_elective }}</span>
+                  {% else %}
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">-</span>
+                  {% endif %}
+                </td>
                 <td style="font-size: 0.82rem; color: var(--text-muted);">{{ s.college }} / {{ s.program }}</td>
                 <td>
                   {% if s.is_active == 1 %}
@@ -346,7 +387,7 @@
                 </td>
                 <td>
                   <div class="table-actions">
-                    <button class="btn-icon" title="Edit Student" onclick="openEditModal({{ s.id }}, '{{ s.roll_no }}', '{{ s.student_name }}', '{{ s.college }}', '{{ s.program }}', '{{ s.branch }}', '{{ s.semester }}', '{{ s.section }}', {{ s.is_active }})">
+                    <button class="btn-icon" title="Edit Student" onclick="openEditModal({{ s.id }}, '{{ s.roll_no }}', '{{ s.student_name }}', '{{ s.college }}', '{{ s.program }}', '{{ s.branch }}', '{{ s.semester }}', '{{ s.section }}', '{{ s.open_elective or '' }}', {{ s.is_active }})">
                       <i class="fa-solid fa-pen-to-square"></i>
                     </button>
 
@@ -363,7 +404,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
                 <i class="fa-solid fa-user-gear fa-2x" style="margin-bottom: 0.5rem; opacity: 0.5;"></i>
                 <br>No student records found matching filters.
               </td>
@@ -394,6 +435,10 @@
         <div class="form-group">
           <label>Student Name</label>
           <input type="text" id="edit_student_name" name="student_name" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Open Elective (OE) Subject</label>
+          <input type="text" id="edit_open_elective" name="open_elective" class="form-control" placeholder="e.g. IPR or Industry 4.0">
         </div>
         <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
           <div class="form-group">
@@ -460,7 +505,7 @@
     }
   }
 
-  function openEditModal(id, roll, name, college, program, branch, sem, sec, isActive) {
+  function openEditModal(id, roll, name, college, program, branch, sem, sec, oe, isActive) {
     document.getElementById('edit_student_id').value = id;
     document.getElementById('edit_roll_no').value = roll;
     document.getElementById('edit_student_name').value = name;
@@ -469,6 +514,7 @@
     document.getElementById('edit_branch').value = branch;
     document.getElementById('edit_semester').value = sem;
     document.getElementById('edit_section').value = sec;
+    document.getElementById('edit_open_elective').value = oe;
     document.getElementById('edit_is_active').value = isActive;
 
     document.getElementById('editStudentModal').classList.add('active');
@@ -490,6 +536,7 @@
     document.getElementById('filter_branch').value = '';
     document.getElementById('filter_sem').value = '';
     document.getElementById('filter_sec').value = '';
+    document.getElementById('filter_oe').value = '';
     document.getElementById('filter_active').value = '';
     triggerLiveSearch();
   }
@@ -502,9 +549,10 @@
       const branch = document.getElementById('filter_branch').value.trim();
       const semester = document.getElementById('filter_sem').value.trim();
       const section = document.getElementById('filter_sec').value.trim();
+      const open_elective = document.getElementById('filter_oe').value;
       const isActive = document.getElementById('filter_active').value;
 
-      const queryParams = new URLSearchParams({ search, branch, semester, section, is_active: isActive });
+      const queryParams = new URLSearchParams({ search, branch, semester, section, open_elective, is_active: isActive });
 
       fetch(`/api/search_students?${queryParams.toString()}`)
         .then(res => res.json())
@@ -522,7 +570,7 @@
     if (!students || students.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+          <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
             <i class="fa-solid fa-user-gear fa-2x" style="margin-bottom: 0.5rem; opacity: 0.5;"></i>
             <br>No student records found matching filters.
           </td>
@@ -538,16 +586,21 @@
       
       const toggleColor = s.is_active === 1 ? '#d97706' : '#16a34a';
 
+      const oeBadge = s.open_elective 
+        ? `<span class="badge-oe"><i class="fa-solid fa-book-open"></i> ${s.open_elective}</span>`
+        : `<span style="color:var(--text-muted); font-size:0.8rem;">-</span>`;
+
       html += `
         <tr>
           <td><strong style="color: var(--primary);">${s.roll_no}</strong></td>
           <td>${s.student_name || '-'}</td>
           <td><span class="badge badge-secondary">${s.branch} - Sem ${s.semester} (Sec ${s.section})</span></td>
+          <td>${oeBadge}</td>
           <td style="font-size: 0.82rem; color: var(--text-muted);">${s.college} / ${s.program}</td>
           <td>${statusPill}</td>
           <td>
             <div class="table-actions">
-              <button class="btn-icon" title="Edit Student" onclick="openEditModal(${s.id}, '${s.roll_no}', '${s.student_name || ''}', '${s.college}', '${s.program}', '${s.branch}', '${s.semester}', '${s.section}', ${s.is_active})">
+              <button class="btn-icon" title="Edit Student" onclick="openEditModal(${s.id}, '${s.roll_no}', '${s.student_name || ''}', '${s.college}', '${s.program}', '${s.branch}', '${s.semester}', '${s.section}', '${s.open_elective || ''}', ${s.is_active})">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
               <a href="/toggle_student_status/${s.id}" class="btn-icon" title="Toggle Active / Left Status">

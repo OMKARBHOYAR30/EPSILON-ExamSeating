@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS classrooms (
 
 -- ============================================================
 -- SECTION STUDENTS (College Master Roll Lists)
--- Handles dropped/left student roll number gaps cleanly
+-- Handles dropped/left student roll number gaps and OE subjects cleanly
 -- ============================================================
 CREATE TABLE IF NOT EXISTS section_students (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS section_students (
     section       TEXT NOT NULL,
     roll_no       TEXT NOT NULL,
     student_name  TEXT DEFAULT '',
+    open_elective TEXT DEFAULT '', -- Open Elective (OE) Subject Name e.g. 'IPR', 'Industry 4.0'
     is_active     INTEGER NOT NULL DEFAULT 1
 );
 
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS allocations (
     exam_date          TEXT NOT NULL DEFAULT (date('now')), -- Manual Exam Date
     academic_year      TEXT NOT NULL DEFAULT '2026-2027', -- Academic Year
     exam_name          TEXT NOT NULL DEFAULT 'CAE-I',     -- Exam Name / Type
+    allocation_type    TEXT NOT NULL DEFAULT 'SECTION',   -- 'SECTION' / 'OE'
     
     -- Left Group
     left_college       TEXT NOT NULL,
@@ -65,10 +67,11 @@ CREATE TABLE IF NOT EXISTS allocations (
     left_branch        TEXT NOT NULL,
     left_semester      TEXT NOT NULL,
     left_section       TEXT NOT NULL,
+    left_oe_subject    TEXT DEFAULT '',
     left_roll_prefix   TEXT DEFAULT '',
     left_roll_from     INTEGER DEFAULT 0,
     left_roll_to       INTEGER DEFAULT 0,
-    left_entry_mode    TEXT DEFAULT 'auto', -- 'auto' / 'manual' / 'dataset'
+    left_entry_mode    TEXT DEFAULT 'auto', -- 'auto' / 'manual' / 'dataset' / 'oe'
     
     -- Right Group
     right_college      TEXT DEFAULT '',
@@ -76,10 +79,11 @@ CREATE TABLE IF NOT EXISTS allocations (
     right_branch       TEXT DEFAULT '',
     right_semester     TEXT DEFAULT '',
     right_section      TEXT DEFAULT '',
+    right_oe_subject   TEXT DEFAULT '',
     right_roll_prefix  TEXT DEFAULT '',
     right_roll_from    INTEGER DEFAULT 0,
     right_roll_to      INTEGER DEFAULT 0,
-    right_entry_mode   TEXT DEFAULT 'auto', -- 'auto' / 'manual' / 'dataset'
+    right_entry_mode   TEXT DEFAULT 'auto', -- 'auto' / 'manual' / 'dataset' / 'oe'
     
     created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
@@ -105,14 +109,3 @@ CREATE TABLE IF NOT EXISTS manual_rolls (
     side          TEXT NOT NULL, -- 'LEFT' / 'RIGHT'
     roll_no       TEXT NOT NULL
 );
-
--- ============================================================
--- INDEXES FOR HIGH-PERFORMANCE SEARCH & DUPLICATE CHECKS
--- ============================================================
-CREATE INDEX IF NOT EXISTS idx_section_students_sec ON section_students(college, branch, semester, section, is_active);
-CREATE INDEX IF NOT EXISTS idx_section_students_roll ON section_students(roll_no);
-CREATE INDEX IF NOT EXISTS idx_allocations_date ON allocations(exam_date, room_no);
-CREATE INDEX IF NOT EXISTS idx_seating_chart_alloc ON seating_chart(allocation_id);
-CREATE INDEX IF NOT EXISTS idx_seating_chart_left ON seating_chart(left_student);
-CREATE INDEX IF NOT EXISTS idx_seating_chart_right ON seating_chart(right_student);
-CREATE INDEX IF NOT EXISTS idx_manual_rolls_alloc ON manual_rolls(allocation_id, roll_no);

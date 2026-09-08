@@ -6,12 +6,36 @@
 {% block content %}
 <form action="{{ url_for('create_seating') }}" method="POST" id="seatingForm">
 
-  <!-- Step 1: Select Academic Year, Exam Selection, Exam Date & Classroom -->
+  <!-- Step 1: Select Allocation Mode, Academic Year, Exam Selection, Exam Date & Classroom -->
   <div class="card">
     <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
       <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">1</span>
-      Exam Details & Classroom Selection
+      Exam Details & Allocation Mode Selection
     </h3>
+
+    <!-- Allocation Type Selection (Regular Section vs Open Elective OE) -->
+    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+      <label style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
+        Choose Seating Allocation Category:
+      </label>
+      <div class="radio-group" style="grid-template-columns: 1fr 1fr;">
+        <label class="radio-card active">
+          <input type="radio" name="allocation_type" id="alloc_type_section" value="SECTION" checked>
+          <div>
+            <strong>🏢 Regular Section Allocation</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">Allocate by Branch, Semester & Section (e.g. CE Sem 5 Sec A)</div>
+          </div>
+        </label>
+
+        <label class="radio-card">
+          <input type="radio" name="allocation_type" id="alloc_type_oe" value="OE">
+          <div>
+            <strong>📖 Open Elective (OE) Exam Allocation</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">Allocate by OE Subject across ALL branches (e.g. IPR, Industry 4.0)</div>
+          </div>
+        </label>
+      </div>
+    </div>
 
     <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
       <!-- Academic Year Selection -->
@@ -82,7 +106,7 @@
   <div class="card">
     <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
       <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">2</span>
-      Choose Seating Type
+      Choose Bench Seating Type
     </h3>
 
     <div class="radio-group">
@@ -111,7 +135,7 @@
       Left Group Details
     </h3>
 
-    <div class="form-row">
+    <div class="form-row" id="left_section_row">
       <div class="form-group">
         <label for="left_college">College</label>
         <input type="text" id="left_college" name="left_college" class="form-control" placeholder="e.g. GHRCE" required value="GHRCE">
@@ -126,13 +150,6 @@
         <label for="left_branch">Branch</label>
         <input type="text" id="left_branch" name="left_branch" class="form-control" placeholder="e.g. CE" required value="CE">
       </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="left_semester">Semester</label>
-        <input type="text" id="left_semester" name="left_semester" class="form-control" placeholder="e.g. 5" required value="5">
-      </div>
 
       <div class="form-group">
         <label for="left_section">Section</label>
@@ -140,10 +157,32 @@
       </div>
     </div>
 
+    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label for="left_semester">Semester</label>
+        <input type="text" id="left_semester" name="left_semester" class="form-control" placeholder="e.g. 5" required value="5">
+      </div>
+
+      <!-- Left OE Subject Selection (Visible in OE Mode) -->
+      <div class="form-group" id="left_oe_inputs" style="display: none;">
+        <label for="left_oe_subject">Select Open Elective (OE) Subject <span style="color:var(--danger);">*</span></label>
+        <select id="left_oe_subject" name="left_oe_subject" class="form-select">
+          <option value="">-- Choose OE Subject --</option>
+          {% for oe in oe_subjects %}
+            <option value="{{ oe.open_elective }}">{{ oe.open_elective }} (Sem {{ oe.semester }} - {{ oe.count }} students)</option>
+          {% endfor %}
+        </select>
+        <span class="form-hint">Aggregates students taking this OE across ALL branches</span>
+      </div>
+    </div>
+
     <!-- Roll Entry Selection Method -->
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
       <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
       <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <label style="display: none; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #0284c7;">
+          <input type="radio" name="left_entry_mode" id="left_mode_oe" value="oe"> Open Elective Subject (Cross-Branch)
+        </label>
         <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: var(--primary);">
           <input type="radio" name="left_entry_mode" id="left_mode_dataset" value="dataset" checked> Student Master Database (Active Students)
         </label>
@@ -168,7 +207,7 @@
           </div>
         </div>
         <div style="font-size: 0.82rem; color: var(--primary); font-weight: 500;" id="left_dataset_preview_text">
-          Loading section roll list preview...
+          Loading student roll list preview...
         </div>
       </div>
 
@@ -189,7 +228,7 @@
       Right Group Details
     </h3>
 
-    <div class="form-row">
+    <div class="form-row" id="right_section_row">
       <div class="form-group">
         <label for="right_college">College</label>
         <input type="text" id="right_college" name="right_college" class="form-control" placeholder="e.g. GHRCE" value="GHRCE">
@@ -204,13 +243,6 @@
         <label for="right_branch">Branch</label>
         <input type="text" id="right_branch" name="right_branch" class="form-control" placeholder="e.g. IT" value="IT">
       </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="right_semester">Semester</label>
-        <input type="text" id="right_semester" name="right_semester" class="form-control" placeholder="e.g. 5" value="5">
-      </div>
 
       <div class="form-group">
         <label for="right_section">Section</label>
@@ -218,10 +250,32 @@
       </div>
     </div>
 
+    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label for="right_semester">Semester</label>
+        <input type="text" id="right_semester" name="right_semester" class="form-control" placeholder="e.g. 5" value="5">
+      </div>
+
+      <!-- Right OE Subject Selection (Visible in OE Mode) -->
+      <div class="form-group" id="right_oe_inputs" style="display: none;">
+        <label for="right_oe_subject">Select Open Elective (OE) Subject <span style="color:var(--danger);">*</span></label>
+        <select id="right_oe_subject" name="right_oe_subject" class="form-select">
+          <option value="">-- Choose OE Subject --</option>
+          {% for oe in oe_subjects %}
+            <option value="{{ oe.open_elective }}">{{ oe.open_elective }} (Sem {{ oe.semester }} - {{ oe.count }} students)</option>
+          {% endfor %}
+        </select>
+        <span class="form-hint">Aggregates students taking this OE across ALL branches</span>
+      </div>
+    </div>
+
     <!-- Roll Entry Selection Method -->
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
       <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
       <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <label style="display: none; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #0284c7;">
+          <input type="radio" name="right_entry_mode" id="right_mode_oe" value="oe"> Open Elective Subject (Cross-Branch)
+        </label>
         <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #059669;">
           <input type="radio" name="right_entry_mode" id="right_mode_dataset" value="dataset" checked> Student Master Database (Active Students)
         </label>
@@ -246,7 +300,7 @@
           </div>
         </div>
         <div style="font-size: 0.82rem; color: #059669; font-weight: 500;" id="right_dataset_preview_text">
-          Loading section roll list preview...
+          Loading student roll list preview...
         </div>
       </div>
 

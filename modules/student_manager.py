@@ -3,11 +3,12 @@ modules/student_manager.py
 ---------------------------
 Student Master Database Management logic for EPSILON.
 Supports:
+- Open Elective (OE) Subject management
 - Bulk paste / manual typing of roll numbers
-- Excel (.xlsx, .xls) and CSV importing
+- Excel (.xlsx, .xls) and CSV importing with OE subjects
 - Single student record creation, modification, deletion
 - Active/Inactive status toggling (dropped / left college)
-- Dynamic filtering and searching by College, Branch, Semester, Section, Keyword
+- Dynamic filtering and searching by College, Branch, Semester, Section, Open Elective, Keyword
 """
 
 import csv
@@ -38,7 +39,24 @@ def get_all_student_sections():
     return [dict(s) for s in sections]
 
 
-def get_students_filtered(college=None, branch=None, semester=None, section=None, search=None, is_active=None):
+def get_available_oe_subjects(semester=None):
+    """Retrieve list of distinct Open Elective (OE) subjects registered in the system."""
+    db = get_db()
+    query = """SELECT DISTINCT open_elective, semester, COUNT(*) as count 
+               FROM section_students 
+               WHERE open_elective IS NOT NULL AND open_elective != '' AND is_active = 1"""
+    params = []
+    if semester:
+        query += " AND semester = ?"
+        params.append(str(semester))
+    
+    query += " GROUP BY open_elective, semester ORDER BY open_elective"
+    rows = db.execute(query, params).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+def get_students_filtered(college=None, branch=None, semester=None, section=None, open_elective=None, search=None, is_active=None):
     """Retrieve student records based on search filters."""
     db = get_db()
     query = "SELECT * FROM section_students WHERE 1=1"
@@ -56,13 +74,16 @@ def get_students_filtered(college=None, branch=None, semester=None, section=None
     if section:
         query += " AND section = ?"
         params.append(section)
+    if open_elective:
+        query += " AND open_elective = ?"
+        params.append(open_elective)
     if is_active is not None and is_active != "":
         query += " AND is_active = ?"
         params.append(int(is_active))
     if search:
-        query += " AND (roll_no LIKE ? OR student_name LIKE ?)"
+        query += " AND (roll_no LIKE ? OR student_name LIKE ? OR open_elective LIKE ?)"
         term = f"%{search}%"
-        params.extend([term, term])
+        params.extend([term, term, term])
 
     query += " ORDER BY college, branch, semester, section, roll_no"
     rows = db.execute(query, params).fetchall()
@@ -83,7 +104,7 @@ def get_students_for_section(branch, semester, section, college="GHRCE"):
     return [dict(s) for s in students]
 
 
-def add_single_student(college, program, branch, semester, section, roll_no, student_name, is_active=1):
+def add_single_student(college, program, branch, semester, section, roll_no, student_name, open_elective="", is_active=1):
     """Adds a single student record to the Master Database."""
     college = (college or "GHRCE").strip()
     program = (program or "B.Tech").strip()
@@ -92,6 +113,7 @@ def add_single_student(college, program, branch, semester, section, roll_no, stu
     section = (section or "").strip().upper()
     roll_no = (roll_no or "").strip()
     student_name = (student_name or f"Student {roll_no}").strip()
+    open_elective = (open_elective or "").strip()
 
     if not branch or not semester or not section or not roll_no:
         return False, "Branch, Semester, Section, and Roll Number are required."
@@ -109,29 +131,31 @@ def add_single_student(college, program, branch, semester, section, roll_no, stu
         return False, f"Student Roll No '{roll_no}' already exists in {branch} Sem {semester} Sec {section}."
 
     db.execute(
-        """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, is_active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (college, program, branch, semester, section, roll_no, student_name, int(is_active))
+        """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (college, program, branch, semester, section, roll_no, student_name, open_elective, int(is_active))
     )
     db.commit()
     db.close()
     return True, f"Successfully added student {roll_no} ({student_name})."
 
 
-def add_section_students(college, program, branch, semester, section, raw_rolls_text, replace_existing=True):
+def add_section_students(college, program, branch, semester, section, raw_rolls_text, default_open_elective="", replace_existing=True):
     """
     Bulk adds student roll numbers by manually typing or pasting text.
-    Handles lines formatted as:
+    Handles formats:
     - CE-101
     - CE-101, CE-102, CE-103
     - CE-101: John Doe
-    - CE-101, John Doe
+    - CE-101: John Doe, IPR
+    - CE-101, John Doe, Industry 4.0
     """
     college = (college or "GHRCE").strip()
     program = (program or "B.Tech").strip()
     branch = (branch or "").strip().upper()
     semester = (semester or "").strip()
     section = (section or "").strip().upper()
+    default_open_elective = (default_open_elective or "").strip()
 
     if not branch or not semester or not section:
         return False, "Branch, Semester, and Section are required."
@@ -147,27 +171,27 @@ def add_section_students(college, program, branch, semester, section, raw_rolls_
         if not line:
             continue
 
-        # If commas separate roll numbers on a single line
+        # Check comma separated parts
         parts = [p.strip() for p in line.split(",") if p.strip()]
 
-        # Check if line was formatted as "RollNo, Student Name" or "RollNo: Student Name"
-        if len(parts) == 2 and not any(ch.isdigit() for ch in parts[1]):
-            roll, name = parts[0], parts[1]
-            student_entries.append((roll, name))
+        if len(parts) >= 3:
+            # Format: Roll, Name, OE Subject
+            student_entries.append((parts[0], parts[1], parts[2]))
+        elif len(parts) == 2:
+            if ":" in parts[0]:
+                r, n = parts[0].split(":", 1)
+                student_entries.append((r.strip(), n.strip(), parts[1]))
+            elif not any(ch.isdigit() for ch in parts[1]):
+                student_entries.append((parts[0], parts[1], default_open_elective))
+            else:
+                for p in parts:
+                    student_entries.append((p, f"Student {p}", default_open_elective))
         else:
-            for part in parts:
-                if ":" in part:
-                    r, n = part.split(":", 1)
-                    student_entries.append((r.strip(), n.strip()))
-                elif "-" in part and not part.split("-")[0].replace(" ", "").isalpha():
-                    # Format like "101 - John"
-                    sub = part.split("-", 1)
-                    if len(sub) == 2 and not any(ch.isdigit() for ch in sub[1]):
-                        student_entries.append((sub[0].strip(), sub[1].strip()))
-                    else:
-                        student_entries.append((part.strip(), f"Student {part.strip()}"))
-                else:
-                    student_entries.append((part.strip(), f"Student {part.strip()}"))
+            if ":" in line:
+                r, n = line.split(":", 1)
+                student_entries.append((r.strip(), n.strip(), default_open_elective))
+            else:
+                student_entries.append((line, f"Student {line}", default_open_elective))
 
     if not student_entries:
         return False, "No valid roll numbers parsed from input."
@@ -180,8 +204,8 @@ def add_section_students(college, program, branch, semester, section, raw_rolls_
         )
 
     inserted = 0
-    for roll_no, student_name in student_entries:
-        # Check duplicate if appending
+    for roll_no, student_name, oe_subject in student_entries:
+        oe_val = oe_subject or default_open_elective
         if not replace_existing:
             dup = db.execute(
                 """SELECT id FROM section_students 
@@ -192,9 +216,9 @@ def add_section_students(college, program, branch, semester, section, raw_rolls_
                 continue
 
         db.execute(
-            """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, is_active)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 1)""",
-            (college, program, branch, semester, section, roll_no, student_name)
+            """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective, is_active)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)""",
+            (college, program, branch, semester, section, roll_no, student_name, oe_val)
         )
         inserted += 1
 
@@ -204,10 +228,10 @@ def add_section_students(college, program, branch, semester, section, raw_rolls_
 
 
 def import_students_from_excel(file_storage, default_college="GHRCE", default_program="B.Tech",
-                              default_branch="", default_semester="", default_section=""):
+                              default_branch="", default_semester="", default_section="", default_oe=""):
     """
     Import student master records from Excel (.xlsx, .xls) or CSV file.
-    Supports columns: Roll No / Roll Number / Roll, Name / Student Name, College, Program, Branch, Semester, Section, Status.
+    Supports columns: Roll No, Name / Student Name, College, Program, Branch, Semester, Section, Open Elective / OE / Elective / Subject, Status.
     """
     filename = file_storage.filename.lower()
     records = []
@@ -223,7 +247,6 @@ def import_students_from_excel(file_storage, default_college="GHRCE", default_pr
                 header = [c.strip().lower() for c in row]
                 continue
 
-            # Process row using header mapping or standard position
             row_dict = {}
             for i, val in enumerate(row):
                 if i < len(header):
@@ -261,7 +284,6 @@ def import_students_from_excel(file_storage, default_college="GHRCE", default_pr
     imported_count = 0
 
     for r in records:
-        # Resolve fields from header variations or default fallback
         roll_no = r.get("roll_no") or r.get("roll no") or r.get("roll") or r.get("rollnumber") or r.get("roll_number") or ""
         student_name = r.get("student_name") or r.get("name") or r.get("student name") or f"Student {roll_no}"
         college = r.get("college") or default_college
@@ -269,6 +291,11 @@ def import_students_from_excel(file_storage, default_college="GHRCE", default_pr
         branch = (r.get("branch") or default_branch).upper()
         semester = str(r.get("semester") or default_semester)
         section = (r.get("section") or default_section).upper()
+
+        open_elective = (
+            r.get("open_elective") or r.get("open elective") or r.get("oe") or 
+            r.get("elective") or r.get("elective_subject") or r.get("subject") or default_oe
+        ).strip()
 
         status_val = str(r.get("status") or r.get("is_active") or "1").lower()
         is_active = 0 if status_val in ("0", "false", "inactive", "left", "dropped") else 1
@@ -286,15 +313,15 @@ def import_students_from_excel(file_storage, default_college="GHRCE", default_pr
         if existing:
             db.execute(
                 """UPDATE section_students 
-                   SET student_name = ?, is_active = ?, program = ?
+                   SET student_name = ?, open_elective = ?, is_active = ?, program = ?
                    WHERE id = ?""",
-                (student_name, is_active, program, existing["id"])
+                (student_name, open_elective, is_active, program, existing["id"])
             )
         else:
             db.execute(
-                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, is_active)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (college, program, branch, semester, section, roll_no, student_name, is_active)
+                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (college, program, branch, semester, section, roll_no, student_name, open_elective, is_active)
             )
         imported_count += 1
 
@@ -302,19 +329,19 @@ def import_students_from_excel(file_storage, default_college="GHRCE", default_pr
     db.close()
 
     if imported_count > 0:
-        return True, f"Successfully imported/updated {imported_count} student records from file!"
+        return True, f"Successfully imported/updated {imported_count} student records with Open Electives from file!"
     return False, "Failed to import student records. Please ensure file contains required columns (Roll No, Branch, Semester, Section)."
 
 
-def update_student(student_id, roll_no, student_name, college, program, branch, semester, section, is_active):
+def update_student(student_id, roll_no, student_name, college, program, branch, semester, section, open_elective, is_active):
     """Updates an existing student record."""
     db = get_db()
     cur = db.execute(
         """UPDATE section_students 
-           SET roll_no = ?, student_name = ?, college = ?, program = ?, branch = ?, semester = ?, section = ?, is_active = ?
+           SET roll_no = ?, student_name = ?, college = ?, program = ?, branch = ?, semester = ?, section = ?, open_elective = ?, is_active = ?
            WHERE id = ?""",
         (roll_no.strip(), student_name.strip(), college.strip(), program.strip(),
-         branch.strip().upper(), semester.strip(), section.strip().upper(), int(is_active), student_id)
+         branch.strip().upper(), semester.strip(), section.strip().upper(), (open_elective or "").strip(), int(is_active), student_id)
     )
     db.commit()
     affected = cur.rowcount > 0
