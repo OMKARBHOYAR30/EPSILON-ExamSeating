@@ -87,8 +87,8 @@ def get_oe_students(semester=None, open_elective="", limit=None, exam_date=None,
     db = get_db()
     query = """SELECT roll_no, student_name, branch, section, open_elective, college, program, semester, is_active 
                FROM section_students 
-               WHERE open_elective = ? AND is_active = 1"""
-    params = [str(open_elective)]
+               WHERE (open_elective = ? OR open_elective LIKE ?) AND is_active = 1"""
+    params = [str(open_elective), f"%{str(open_elective)}%"]
     if semester and str(semester).strip():
         query += " AND semester = ?"
         params.append(str(semester).strip())

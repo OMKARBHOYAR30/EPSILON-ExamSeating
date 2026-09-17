@@ -77,8 +77,8 @@ def get_students_filtered(college=None, branch=None, semester=None, section=None
         query += " AND section = ?"
         params.append(section)
     if open_elective:
-        query += " AND open_elective = ?"
-        params.append(open_elective)
+        query += " AND (open_elective = ? OR open_elective LIKE ?)"
+        params.extend([open_elective, f"%{open_elective}%"])
     if is_active is not None and is_active != "":
         query += " AND is_active = ?"
         params.append(int(is_active))

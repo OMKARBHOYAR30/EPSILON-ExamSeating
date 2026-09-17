@@ -440,12 +440,14 @@
         
         <input type="text" id="filter_sec" class="form-control" style="max-width: 70px;" placeholder="Sec" value="{{ section_filter }}" onchange="triggerLiveSearch()">
 
-        <select id="filter_oe" class="form-select" style="max-width: 150px;" onchange="triggerLiveSearch()">
+        <select id="filter_oe" class="form-select" style="max-width: 140px;" onchange="triggerLiveSearch()">
           <option value="">All OE Subjects</option>
           {% for oe in oe_subjects %}
             <option value="{{ oe.open_elective }}" {% if oe_filter == oe.open_elective %}selected{% endif %}>{{ oe.open_elective }} (Sem {{ oe.semester }})</option>
           {% endfor %}
         </select>
+
+        <input type="text" id="filter_oe_manual" class="form-control" style="max-width: 160px;" placeholder="Type OE Code/Name..." onkeyup="triggerLiveSearch()">
 
         <select id="filter_active" class="form-select" style="max-width: 120px;" onchange="triggerLiveSearch()">
           <option value="" {% if active_filter == '' %}selected{% endif %}>All Status</option>
@@ -707,7 +709,8 @@
       const branch = document.getElementById('filter_branch').value.trim();
       const semester = document.getElementById('filter_sem').value.trim();
       const section = document.getElementById('filter_sec').value.trim();
-      const open_elective = document.getElementById('filter_oe').value;
+      const manualOe = document.getElementById('filter_oe_manual') ? document.getElementById('filter_oe_manual').value.trim() : '';
+      const open_elective = document.getElementById('filter_oe').value || manualOe;
       const isActive = document.getElementById('filter_active').value;
 
       const queryParams = new URLSearchParams({ search, branch, semester, section, open_elective, is_active: isActive });
