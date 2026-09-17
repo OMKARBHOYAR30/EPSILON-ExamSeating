@@ -72,10 +72,40 @@
       </div>
     </div>
 
+    <!-- CA Exam Anti-Cheating Mode Toggle -->
+    <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px solid #ffedd5; margin-bottom: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <strong style="color: #c2410c; font-size: 0.9rem;">🛡️ CA / CAE Exam Anti-Cheating Interleaving Mode</strong>
+          <div style="font-size: 0.78rem; color: #9a3412;">Enforces strict cross-subject bench interleaving & row staggering for Continuous Assessment exams.</div>
+        </div>
+        <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 700; color: #c2410c;">
+          <input type="checkbox" name="ca_anti_cheating" id="ca_anti_cheating" value="1" checked onchange="validateCAExamRules()"> Active (Strict Anti-Cheating)
+        </label>
+      </div>
+      <div id="ca_warning_banner" style="display: none; margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; color: #991b1b; font-size: 0.82rem; font-weight: 600;">
+        <i class="fa-solid fa-triangle-exclamation"></i> CA Exam Anti-Cheating Warning: Left Group and Right Group MUST be different branches or OE subjects so adjacent students receive different exam papers!
+      </div>
+    </div>
+
+    <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+      <label style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
+        Target Allocation Scope:
+      </label>
+      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+        <label style="cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+          <input type="radio" name="allocation_scope" id="scope_single" value="single" checked onchange="toggleAllocationScopeUI()"> 📌 Single Room Mode
+        </label>
+        <label style="cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: var(--primary);">
+          <input type="radio" name="allocation_scope" id="scope_multi" value="multi" onchange="toggleAllocationScopeUI()"> ⚡ Auto Multi-Room Generator (Seat Whole Class/OE Dataset)
+        </label>
+      </div>
+    </div>
+
     <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
       <div class="form-group">
-        <label for="select_block">Select Block</label>
-        <select id="select_block" class="form-select" required>
+        <label for="select_block">Select Block <span style="color:var(--danger);">*</span></label>
+        <select id="select_block" name="block" class="form-select" required>
           <option value="">-- Select Block --</option>
           {% for b in blocks %}
             <option value="{{ b }}">Block {{ b }}</option>
@@ -83,12 +113,22 @@
         </select>
       </div>
 
-      <div class="form-group">
-        <label for="select_room">Choose Room</label>
-        <select id="select_room" name="room_no" class="form-select" required>
+      <div class="form-group" id="single_room_group">
+        <label for="select_room">Choose Single Room <span style="color:var(--danger);">*</span></label>
+        <select id="select_room" name="room_no" class="form-select">
           <option value="">-- Choose Block First --</option>
         </select>
-        <input type="hidden" id="selected_block_input" name="block" value="">
+        <input type="hidden" id="selected_block_input" name="block_hidden" value="">
+      </div>
+    </div>
+
+    <!-- Multi-Room Checkboxes Container (Visible in Multi-Room Mode) -->
+    <div id="multi_room_group" style="display: none; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 1rem;">
+      <label style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
+        Select Target Rooms in Block for Automatic Seating:
+      </label>
+      <div id="multi_room_checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+        <span style="font-size: 0.82rem; color: var(--text-muted);">Please select a Block above to load available rooms.</span>
       </div>
     </div>
 

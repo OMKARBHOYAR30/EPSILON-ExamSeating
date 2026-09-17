@@ -42,16 +42,18 @@ def get_all_student_sections():
 def get_available_oe_subjects(semester=None):
     """Retrieve list of distinct Open Elective (OE) subjects registered in the system."""
     db = get_db()
-    query = """SELECT DISTINCT open_elective, semester, COUNT(*) as count 
-               FROM section_students 
-               WHERE open_elective IS NOT NULL AND open_elective != '' AND is_active = 1"""
-    params = []
     if semester:
-        query += " AND semester = ?"
-        params.append(str(semester))
-    
-    query += " GROUP BY open_elective, semester ORDER BY open_elective"
-    rows = db.execute(query, params).fetchall()
+        query = """SELECT open_elective, semester, COUNT(*) as count 
+                   FROM section_students 
+                   WHERE open_elective IS NOT NULL AND open_elective != '' AND is_active = 1 AND semester = ?
+                   GROUP BY open_elective, semester ORDER BY open_elective"""
+        rows = db.execute(query, (str(semester),)).fetchall()
+    else:
+        query = """SELECT open_elective, GROUP_CONCAT(DISTINCT semester) as semester, COUNT(*) as count 
+                   FROM section_students 
+                   WHERE open_elective IS NOT NULL AND open_elective != '' AND is_active = 1
+                   GROUP BY open_elective ORDER BY open_elective"""
+        rows = db.execute(query).fetchall()
     db.close()
     return [dict(r) for r in rows]
 
@@ -389,3 +391,82 @@ def delete_section_dataset(branch, semester, section, college="GHRCE"):
     if affected:
         return True, f"Deleted student dataset for {branch} Sem {semester} Sec {section}."
     return False, "Section dataset not found."
+
+
+def batch_update_student_oe(college, branch, semester, section, rolls_oe_text):
+    """
+    Updates Open Elective (OE) subject for existing students in a section.
+    Supports formats:
+    - ALL: Subject Name
+    - CE-101: Industry 4.0
+    - CE-101, IPR
+    - CE-101 to CE-120: Cyber Security
+    """
+    college = (college or "GHRCE").strip()
+    branch = (branch or "").strip().upper()
+    semester = str(semester or "").strip()
+    section = (section or "").strip().upper()
+
+    if not branch or not semester or not section:
+        return False, "Branch, Semester, and Section are required."
+
+    if not rolls_oe_text or not rolls_oe_text.strip():
+        return False, "Please enter roll numbers and OE subjects to update."
+
+    lines = rolls_oe_text.strip().splitlines()
+    db = get_db()
+    updated_count = 0
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        if line.lower().startswith("all:") or line.lower().startswith("all,"):
+            oe_sub = line.split(":", 1)[-1].split(",", 1)[-1].strip()
+            cur = db.execute(
+                "UPDATE section_students SET open_elective = ? WHERE college = ? AND branch = ? AND semester = ? AND section = ?",
+                (oe_sub, college, branch, semester, section)
+            )
+            updated_count += cur.rowcount
+            continue
+
+        if " to " in line.lower() and ":" in line:
+            range_part, oe_sub = line.split(":", 1)
+            oe_sub = oe_sub.strip()
+            start_r, end_r = range_part.lower().split(" to ", 1)
+            start_r = start_r.strip()
+            end_r = end_r.strip()
+
+            rows = db.execute(
+                "SELECT id, roll_no FROM section_students WHERE college = ? AND branch = ? AND semester = ? AND section = ?",
+                (college, branch, semester, section)
+            ).fetchall()
+
+            for r in rows:
+                r_no = r["roll_no"].lower()
+                if start_r in r_no or end_r in r_no or (r_no >= start_r and r_no <= end_r):
+                    db.execute("UPDATE section_students SET open_elective = ? WHERE id = ?", (oe_sub, r["id"]))
+                    updated_count += 1
+            continue
+
+        parts = []
+        if ":" in line:
+            parts = [p.strip() for p in line.split(":", 1)]
+        elif "," in line:
+            parts = [p.strip() for p in line.split(",", 1)]
+
+        if len(parts) == 2:
+            roll_no, oe_sub = parts[0], parts[1]
+            cur = db.execute(
+                "UPDATE section_students SET open_elective = ? WHERE college = ? AND branch = ? AND semester = ? AND section = ? AND (roll_no = ? OR roll_no LIKE ?)",
+                (oe_sub, college, branch, semester, section, roll_no, f"%{roll_no}%")
+            )
+            updated_count += cur.rowcount
+
+    db.commit()
+    db.close()
+
+    if updated_count > 0:
+        return True, f"Successfully updated Open Elective subject for {updated_count} student records in {branch} Sem {semester} Sec {section}!"
+    return False, f"No matching student records found in {branch} Sem {semester} Sec {section} to update."

@@ -78,19 +78,23 @@ def get_section_students(branch, semester, section, limit=None, college="GHRCE",
     return filtered
 
 
-def get_oe_students(semester, open_elective, limit=None, exam_date=None, exclude_allocated=True):
+def get_oe_students(semester=None, open_elective="", limit=None, exam_date=None, exclude_allocated=True):
     """
     Retrieve active students enrolled in a specific Open Elective (OE) subject across ALL colleges, branches, and sections.
+    If `semester` is provided, filters by semester; otherwise aggregates across all semesters.
     If `exam_date` is provided and `exclude_allocated=True`, excludes students already allocated on that date.
     """
     db = get_db()
-    rows = db.execute(
-        """SELECT roll_no, student_name, branch, section, open_elective, college, program, semester, is_active 
-           FROM section_students 
-           WHERE semester = ? AND open_elective = ? AND is_active = 1 
-           ORDER BY branch, section, roll_no""",
-        (str(semester), str(open_elective))
-    ).fetchall()
+    query = """SELECT roll_no, student_name, branch, section, open_elective, college, program, semester, is_active 
+               FROM section_students 
+               WHERE open_elective = ? AND is_active = 1"""
+    params = [str(open_elective)]
+    if semester and str(semester).strip():
+        query += " AND semester = ?"
+        params.append(str(semester).strip())
+
+    query += " ORDER BY semester, branch, section, roll_no"
+    rows = db.execute(query, params).fetchall()
     db.close()
 
     all_students = [dict(r) for r in rows]
@@ -348,17 +352,205 @@ def create_seating_allocation(data):
         for r in right_students:
             db.execute("INSERT INTO manual_rolls (allocation_id, side, roll_no) VALUES (?, 'RIGHT', ?)", (allocation_id, r))
 
-    # Populate bench-wise seating chart
-    for b in range(1, total_benches + 1):
-        l_stud = left_students[b - 1] if b <= len(left_students) else ""
-        r_stud = right_students[b - 1] if (bench_mode == "DOUBLE" and b <= len(right_students)) else ""
-        db.execute(
-            """INSERT INTO seating_chart (allocation_id, bench_no, left_student, right_student, room_no)
-               VALUES (?, ?, ?, ?, ?)""",
-            (allocation_id, b, l_stud, r_stud, room_no)
-        )
+    # Populate bench-wise seating chart (with optional CA Anti-Cheating row staggering)
+    ca_stagger = data.get("ca_anti_cheating") in ("1", "true", True, 1) or exam_name in ("CAE-I", "CAE-II")
+    bench_counter = 1
+
+    for row_idx, bench_count in enumerate(benches_per_row):
+        is_even_row = (row_idx % 2 == 1)
+        for _ in range(bench_count):
+            b = bench_counter
+            l_stud = left_students[b - 1] if b <= len(left_students) else ""
+            r_stud = right_students[b - 1] if (bench_mode == "DOUBLE" and b <= len(right_students)) else ""
+
+            if ca_stagger and is_even_row and bench_mode == "DOUBLE":
+                l_stud, r_stud = r_stud, l_stud
+
+            db.execute(
+                """INSERT INTO seating_chart (allocation_id, bench_no, left_student, right_student, room_no)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (allocation_id, b, l_stud, r_stud, room_no)
+            )
+            bench_counter += 1
 
     db.commit()
     db.close()
 
     return True, f"Seating arrangement for Room {room_no} generated successfully for {exam_name} ({academic_year})!", allocation_id
+
+
+def auto_generate_multi_room_seating(data):
+    """
+    Automatically distributes unallocated students across multiple classrooms for a dataset (SECTION or OE).
+    Fills room by room until all students are seated or available rooms are exhausted.
+    """
+    allocation_type = data.get("allocation_type", "SECTION")
+    bench_mode = data.get("bench_mode", "DOUBLE")
+    academic_year = data.get("academic_year", "2026-2027").strip() or "2026-2027"
+    exam_name = data.get("exam_name", "CAE-I").strip() or "CAE-I"
+    exam_date = data.get("exam_date", "").strip() or datetime.now().strftime("%Y-%m-%d")
+
+    # Get room list
+    room_nos = data.get("selected_rooms", [])
+    if isinstance(room_nos, str):
+        room_nos = [r.strip() for r in room_nos.split(",") if r.strip()]
+
+    if not room_nos:
+        # Fallback to all rooms in block if block provided
+        block = data.get("block", "").strip()
+        db = get_db()
+        if block:
+            rooms_db = db.execute("SELECT room_no FROM classrooms WHERE block = ? ORDER BY room_no", (block,)).fetchall()
+        else:
+            rooms_db = db.execute("SELECT room_no FROM classrooms ORDER BY block, room_no").fetchall()
+        db.close()
+        room_nos = [r["room_no"] for r in rooms_db]
+
+    if not room_nos:
+        return False, "No classrooms selected for auto-allocation.", []
+
+    already_allocated_rolls = get_allocated_students_by_date(exam_date)
+
+    # Fetch Left Group Students
+    left_college = data.get("left_college", "GHRCE")
+    left_program = data.get("left_program", "B.Tech")
+    left_branch = data.get("left_branch", "")
+    left_semester = data.get("left_semester", "")
+    left_section = data.get("left_section", "")
+    left_oe_subject = data.get("left_oe_subject", "").strip()
+    left_entry_mode = data.get("left_entry_mode", "dataset")
+
+    if allocation_type == "OE" or left_entry_mode == "oe" or (left_oe_subject and not left_branch):
+        left_entry_mode = "oe"
+
+    if left_entry_mode == "oe":
+        left_student_rows = get_oe_students(left_semester, left_oe_subject, exam_date=exam_date, exclude_allocated=True)
+        left_students = [s["roll_no"] for s in left_student_rows]
+        left_roll_prefix = f"OE-{left_oe_subject}"
+        if not left_branch:
+            left_branch = f"OE ({left_oe_subject})"
+        if not left_section:
+            left_section = "ALL"
+    else:
+        left_student_rows = get_section_students(left_branch, left_semester, left_section, college=left_college, exam_date=exam_date, exclude_allocated=True)
+        left_students = [s["roll_no"] for s in left_student_rows]
+        left_roll_prefix = "MASTER-DB"
+
+    # Fetch Right Group Students (if DOUBLE mode)
+    right_college = data.get("right_college", "GHRCE")
+    right_program = data.get("right_program", "B.Tech")
+    right_branch = data.get("right_branch", "")
+    right_semester = data.get("right_semester", "")
+    right_section = data.get("right_section", "")
+    right_oe_subject = data.get("right_oe_subject", "").strip()
+    right_entry_mode = data.get("right_entry_mode", "dataset")
+    right_students = []
+    right_roll_prefix = ""
+
+    if allocation_type == "OE" or right_entry_mode == "oe" or (right_oe_subject and not right_branch):
+        right_entry_mode = "oe"
+
+    if bench_mode == "DOUBLE":
+        if right_entry_mode == "oe":
+            right_student_rows = get_oe_students(right_semester, right_oe_subject, exam_date=exam_date, exclude_allocated=True)
+            right_students = [s["roll_no"] for s in right_student_rows if s["roll_no"] not in left_students]
+            right_roll_prefix = f"OE-{right_oe_subject}"
+            if not right_branch:
+                right_branch = f"OE ({right_oe_subject})"
+            if not right_section:
+                right_section = "ALL"
+        else:
+            right_student_rows = get_section_students(right_branch, right_semester, right_section, college=right_college, exam_date=exam_date, exclude_allocated=True)
+            right_students = [s["roll_no"] for s in right_student_rows if s["roll_no"] not in left_students]
+            right_roll_prefix = "MASTER-DB"
+
+    if not left_students and not right_students:
+        return False, "No unallocated students found for the selected section/OE dataset on this exam date.", []
+
+    total_left_to_seat = len(left_students)
+    total_right_to_seat = len(right_students)
+
+    created_allocations = []
+    db = get_db()
+
+    left_idx = 0
+    right_idx = 0
+
+    for r_no in room_nos:
+        if left_idx >= len(left_students) and (bench_mode == "SINGLE" or right_idx >= len(right_students)):
+            break
+
+        room = db.execute("SELECT * FROM classrooms WHERE room_no = ?", (r_no,)).fetchone()
+        if not room:
+            continue
+
+        rows, capacity, benches_per_row = parse_row_layout(room["default_row_layout"])
+        total_benches = sum(benches_per_row)
+        block = room["block"]
+
+        # Chunk for room
+        r_left_chunk = left_students[left_idx : left_idx + total_benches]
+        left_idx += len(r_left_chunk)
+
+        r_right_chunk = []
+        if bench_mode == "DOUBLE":
+            r_right_chunk = right_students[right_idx : right_idx + total_benches]
+            right_idx += len(r_right_chunk)
+
+        if not r_left_chunk and not r_right_chunk:
+            continue
+
+        used_cap = max(len(r_left_chunk), len(r_right_chunk))
+
+        cur = db.execute(
+            """INSERT INTO allocations (
+                room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name, allocation_type,
+                left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
+                left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
+                right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
+                right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                r_no, block, used_cap, rows, room["default_row_layout"], bench_mode, exam_date, academic_year, exam_name, allocation_type,
+                left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
+                left_roll_prefix, 1, len(r_left_chunk), left_entry_mode,
+                right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
+                right_roll_prefix, 1, len(r_right_chunk), right_entry_mode
+            )
+        )
+        alloc_id = cur.lastrowid
+        created_allocations.append(alloc_id)
+
+        for s_roll in r_left_chunk:
+            db.execute("INSERT INTO manual_rolls (allocation_id, side, roll_no) VALUES (?, 'LEFT', ?)", (alloc_id, s_roll))
+        for s_roll in r_right_chunk:
+            db.execute("INSERT INTO manual_rolls (allocation_id, side, roll_no) VALUES (?, 'RIGHT', ?)", (alloc_id, s_roll))
+
+        ca_stagger = data.get("ca_anti_cheating") in ("1", "true", True, 1) or exam_name in ("CAE-I", "CAE-II")
+        bench_counter = 1
+
+        for row_idx, bench_count in enumerate(benches_per_row):
+            is_even_row = (row_idx % 2 == 1)
+            for _ in range(bench_count):
+                b = bench_counter
+                l_stud = r_left_chunk[b - 1] if b <= len(r_left_chunk) else ""
+                r_stud = r_right_chunk[b - 1] if (bench_mode == "DOUBLE" and b <= len(r_right_chunk)) else ""
+
+                if ca_stagger and is_even_row and bench_mode == "DOUBLE":
+                    l_stud, r_stud = r_stud, l_stud
+
+                db.execute(
+                    """INSERT INTO seating_chart (allocation_id, bench_no, left_student, right_student, room_no)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (alloc_id, b, l_stud, r_stud, r_no)
+                )
+                bench_counter += 1
+
+    db.commit()
+    db.close()
+
+    total_seated_left = min(left_idx, total_left_to_seat)
+    total_seated_right = min(right_idx, total_right_to_seat)
+    summary_msg = f"Auto-allocated {total_seated_left + total_seated_right} students across {len(created_allocations)} rooms for {exam_name} ({exam_date})!"
+
+    return True, summary_msg, created_allocations

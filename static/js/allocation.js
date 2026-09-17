@@ -275,26 +275,57 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
+function toggleAllocationScopeUI() {
+  const scopeMulti = document.getElementById("scope_multi");
+  const seatingForm = document.getElementById("seatingForm");
+  const singleGroup = document.getElementById("single_room_group");
+  const multiGroup = document.getElementById("multi_room_group");
+  const selectRoom = document.getElementById("select_room");
+
+  if (scopeMulti && scopeMulti.checked) {
+    if (seatingForm) seatingForm.action = "/auto_create_seating";
+    if (singleGroup) singleGroup.style.display = "none";
+    if (multiGroup) multiGroup.style.display = "block";
+    if (selectRoom) selectRoom.required = false;
+  } else {
+    if (seatingForm) seatingForm.action = "/create_seating";
+    if (singleGroup) singleGroup.style.display = "block";
+    if (multiGroup) multiGroup.style.display = "none";
+    if (selectRoom) selectRoom.required = true;
+  }
+}
+
   // Block change -> load rooms
-  if (blockSelect && roomSelect) {
+  if (blockSelect) {
     blockSelect.addEventListener("change", function() {
       const block = this.value;
-      roomSelect.innerHTML = '<option value="">-- Choose Room --</option>';
+      if (roomSelect) roomSelect.innerHTML = '<option value="">-- Choose Room --</option>';
+      const multiBox = document.getElementById("multi_room_checkboxes");
+      if (multiBox) multiBox.innerHTML = '<span style="font-size: 0.82rem; color: var(--text-muted);">Loading rooms...</span>';
       if (roomInfoCard) roomInfoCard.style.display = "none";
 
       if (block) {
         fetch(`/api/get_rooms?block=${encodeURIComponent(block)}`)
           .then(res => res.json())
           .then(rooms => {
+            if (multiBox) multiBox.innerHTML = '';
             rooms.forEach(r => {
-              const opt = document.createElement("option");
-              opt.value = r.room_no;
-              opt.textContent = `${r.room_no} (Cap: ${r.default_capacity})`;
-              opt.dataset.capacity = r.default_capacity;
-              opt.dataset.rows = r.default_rows;
-              opt.dataset.layout = r.default_row_layout;
-              opt.dataset.block = r.block;
-              roomSelect.appendChild(opt);
+              if (roomSelect) {
+                const opt = document.createElement("option");
+                opt.value = r.room_no;
+                opt.textContent = `${r.room_no} (Cap: ${r.default_capacity})`;
+                opt.dataset.capacity = r.default_capacity;
+                opt.dataset.rows = r.default_rows;
+                opt.dataset.layout = r.default_row_layout;
+                opt.dataset.block = r.block;
+                roomSelect.appendChild(opt);
+              }
+              if (multiBox) {
+                const lbl = document.createElement("label");
+                lbl.style.cssText = "display:inline-flex; align-items:center; gap:0.35rem; background:#fff; padding:0.4rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:600;";
+                lbl.innerHTML = `<input type="checkbox" name="selected_rooms" value="${r.room_no}" checked> Room ${r.room_no} (${r.default_capacity} seats)`;
+                multiBox.appendChild(lbl);
+              }
             });
           })
           .catch(err => console.error("Error fetching rooms:", err));

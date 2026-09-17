@@ -17,10 +17,10 @@ from modules.room_manager import get_all_rooms, get_rooms_by_block, get_blocks, 
 from modules.student_manager import (
     get_all_student_sections, get_available_oe_subjects, get_students_filtered, get_students_for_section,
     add_single_student, add_section_students, import_students_from_excel,
-    update_student, toggle_student_status, delete_student, delete_section_dataset
+    update_student, toggle_student_status, delete_student, delete_section_dataset, batch_update_student_oe
 )
 from modules.allocation_manager import (
-    create_seating_allocation, get_all_allocations, get_recent_allocations,
+    create_seating_allocation, auto_generate_multi_room_seating, get_all_allocations, get_recent_allocations,
     get_allocation_by_id, delete_allocation, check_existing_allocation,
     get_available_sections, get_section_students, get_oe_students, get_allocated_students_by_date
 )
@@ -336,6 +336,24 @@ def delete_section_dataset_route():
     return redirect(url_for("student_management"))
 
 
+@app.route("/batch_update_oe", methods=["POST"])
+@login_required
+def batch_update_oe_route():
+    college = request.form.get("college", "GHRCE")
+    branch = request.form.get("branch")
+    semester = request.form.get("semester")
+    section = request.form.get("section")
+    rolls_oe_text = request.form.get("rolls_oe_text", "")
+
+    success, msg = batch_update_student_oe(college, branch, semester, section, rolls_oe_text)
+    if success:
+        flash(msg, "success")
+    else:
+        flash(msg, "danger")
+
+    return redirect(url_for("student_management"))
+
+
 # ============================================================
 # NEW SEATING ARRANGEMENT ROUTES & APIS
 # ============================================================
@@ -361,6 +379,25 @@ def create_seating():
         return redirect(url_for("block_report", alloc_id=alloc_id))
     else:
         flash(msg, "danger")
+        return redirect(url_for("new_seating"))
+
+
+@app.route("/auto_create_seating", methods=["POST"])
+@login_required
+def auto_create_seating():
+    data = request.form.to_dict()
+    selected_rooms = request.form.getlist("selected_rooms")
+    if selected_rooms:
+        data["selected_rooms"] = selected_rooms
+
+    success, msg, alloc_ids = auto_generate_multi_room_seating(data)
+
+    if success and alloc_ids:
+        generate_all_reports()
+        flash(msg, "success")
+        return redirect(url_for("block_report", alloc_id=alloc_ids[0]))
+    else:
+        flash(msg if not success else "No allocations generated.", "danger")
         return redirect(url_for("new_seating"))
 
 

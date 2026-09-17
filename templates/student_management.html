@@ -104,6 +104,9 @@
         <button type="button" class="tab-btn" onclick="switchTab('single')">
           <i class="fa-solid fa-user-plus"></i> Single Add
         </button>
+        <button type="button" class="tab-btn" onclick="switchTab('oe_assign')">
+          <i class="fa-solid fa-pen-to-square"></i> Quick OE Assign
+        </button>
       </div>
 
       <!-- TAB 1: Manual Roll Typing & Bulk Entry -->
@@ -273,6 +276,40 @@
           <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
             <i class="fa-solid fa-plus"></i> Add Student
           </button>
+      </div>
+
+      <!-- TAB 4: Quick Batch OE Assign for Existing Students -->
+      <div id="tab-oe_assign" class="tab-content">
+        <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-heading);">
+          Quick OE Assignment for Existing Section
+        </h3>
+
+        <form action="{{ url_for('batch_update_oe_route') }}" method="POST">
+          <input type="hidden" name="college" value="GHRCE">
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+            <div class="form-group">
+              <label for="oe_branch">Branch</label>
+              <input type="text" id="oe_branch" name="branch" class="form-control" placeholder="e.g. CE" required>
+            </div>
+            <div class="form-group">
+              <label for="oe_semester">Semester</label>
+              <input type="text" id="oe_semester" name="semester" class="form-control" placeholder="e.g. 5" required>
+            </div>
+            <div class="form-group">
+              <label for="oe_section">Section</label>
+              <input type="text" id="oe_section" name="section" class="form-control" placeholder="e.g. A" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="rolls_oe_text">Assign OE Subjects to Existing Students</label>
+            <textarea id="rolls_oe_text" name="rolls_oe_text" class="form-control" rows="6" placeholder="Assign OE to all in section:&#10;ALL: Industry 4.0&#10;&#10;OR by Roll Range:&#10;CE-101 to CE-120: Industry 4.0&#10;CE-121 to CE-140: IPR&#10;&#10;OR by Roll Number:&#10;CE-101: Industry 4.0&#10;CE-102: Cyber Security" required></textarea>
+            <span class="form-hint">Updates OE subjects for active students already in Master DB</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; background: #0284c7; border-color: #0284c7;">
+            <i class="fa-solid fa-floppy-disk"></i> Save OE Assignments
+          </button>
         </form>
       </div>
 
@@ -304,6 +341,35 @@
         </div>
       {% else %}
         <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 1rem;">No section datasets registered yet.</div>
+      {% endif %}
+    </div>
+
+    <!-- Open Elective Datasets Summary Card -->
+    <div class="card" style="margin-top: 1.25rem;">
+      <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;">
+        <i class="fa-solid fa-book-open" style="color: #0284c7;"></i> Open Elective (OE) Datasets
+      </h3>
+      {% if oe_subjects %}
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
+          {% for oe in oe_subjects %}
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f0f9ff; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.85rem;">
+              <div>
+                <strong style="color: #0369a1;">{{ oe.open_elective }}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">{% if oe.semester %}Sem {{ oe.semester }} | {% endif %}{{ oe.count }} students enrolled</div>
+              </div>
+              <div style="display: flex; gap: 0.3rem;">
+                <button class="btn-icon" title="Filter by OE Subject" onclick="filterByOE('{{ oe.open_elective }}')">
+                  <i class="fa-solid fa-filter" style="color: #0284c7;"></i>
+                </button>
+                <a href="{{ url_for('new_seating') }}" class="btn-icon" title="Create Seating Allocation for OE">
+                  <i class="fa-solid fa-wand-magic-sparkles" style="color: #16a34a;"></i>
+                </a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 1rem;">No Open Elective subjects registered yet.</div>
       {% endif %}
     </div>
   </div>
@@ -496,6 +562,9 @@
     } else if (tabName === 'single') {
       document.querySelectorAll('.tab-btn')[2].classList.add('active');
       document.getElementById('tab-single').classList.add('active');
+    } else if (tabName === 'oe_assign') {
+      document.querySelectorAll('.tab-btn')[3].classList.add('active');
+      document.getElementById('tab-oe_assign').classList.add('active');
     }
   }
 
@@ -528,6 +597,11 @@
     document.getElementById('filter_branch').value = branch;
     document.getElementById('filter_sem').value = sem;
     document.getElementById('filter_sec').value = sec;
+    triggerLiveSearch();
+  }
+
+  function filterByOE(oeSubject) {
+    document.getElementById('filter_oe').value = oeSubject;
     triggerLiveSearch();
   }
 
