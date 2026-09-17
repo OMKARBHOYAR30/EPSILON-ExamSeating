@@ -156,8 +156,75 @@ def get_recent_allocations(limit=5):
     return [dict(a) for a in allocations]
 
 
+def get_allocation_paper_count_breakdown(allocation_id):
+    """
+    Calculates the exact count of question papers required per subject/OE subject for a room allocation.
+    Returns list of dicts: [{'subject': 'Industry 4.0', 'count': 10}, ...]
+    """
+    db = get_db()
+    allocation = db.execute("SELECT * FROM allocations WHERE id = ?", (allocation_id,)).fetchone()
+    if not allocation:
+        db.close()
+        return []
+
+    chart_rows = db.execute(
+        "SELECT left_student, right_student FROM seating_chart WHERE allocation_id = ?",
+        (allocation_id,)
+    ).fetchall()
+
+    rolls = []
+    for r in chart_rows:
+        if r["left_student"] and r["left_student"].strip():
+            rolls.append(r["left_student"].strip())
+        if r["right_student"] and r["right_student"].strip():
+            rolls.append(r["right_student"].strip())
+
+    if not rolls:
+        db.close()
+        return []
+
+    placeholders = ",".join(["?"] * len(rolls))
+    students = db.execute(
+        f"SELECT roll_no, branch, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
+        rolls
+    ).fetchall()
+
+    student_map = {s["roll_no"]: s for s in students}
+    subject_counts = {}
+
+    is_oe_alloc = allocation["allocation_type"] == "OE"
+    left_oe_sub = allocation["left_oe_subject"]
+    right_oe_sub = allocation["right_oe_subject"]
+
+    for r_no in rolls:
+        stud = student_map.get(r_no)
+        sub = ""
+
+        if stud:
+            if is_oe_alloc and stud["open_elective"]:
+                sub = stud["open_elective"].strip()
+            elif stud["open_elective"]:
+                sub = stud["open_elective"].strip()
+            else:
+                sub = f"{stud['branch']} Paper"
+
+        if not sub:
+            if is_oe_alloc:
+                sub = left_oe_sub or right_oe_sub or "OE Subject"
+            else:
+                sub = allocation["left_branch"] or "Regular Exam Paper"
+
+        subject_counts[sub] = subject_counts.get(sub, 0) + 1
+
+    db.close()
+
+    result = [{"subject": k, "count": v} for k, v in subject_counts.items()]
+    result.sort(key=lambda x: x["count"], reverse=True)
+    return result
+
+
 def get_allocation_by_id(allocation_id):
-    """Fetch allocation detail with its seating chart."""
+    """Fetch allocation detail with its seating chart and paper count breakdown."""
     db = get_db()
     allocation = db.execute("SELECT * FROM allocations WHERE id = ?", (allocation_id,)).fetchone()
     if not allocation:
@@ -172,6 +239,7 @@ def get_allocation_by_id(allocation_id):
     db.close()
 
     alloc_dict["seating_chart"] = [dict(c) for c in chart_rows]
+    alloc_dict["paper_counts"] = get_allocation_paper_count_breakdown(allocation_id)
     return alloc_dict
 
 

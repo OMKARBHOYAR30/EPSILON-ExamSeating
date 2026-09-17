@@ -116,6 +116,15 @@ def generate_block_report(allocation_id=None):
         pdf.setFont("Helvetica-Bold", 12)
         pdf.drawString(40, y, f"Room No. {room_no}")
 
+        from modules.allocation_manager import get_allocation_paper_count_breakdown
+        paper_counts = get_allocation_paper_count_breakdown(allocation["id"])
+        if paper_counts:
+            paper_str = "   |   ".join([f"{p['subject']}: {p['count']} Papers" for p in paper_counts])
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.setFillColor(colors.HexColor("#0369a1"))
+            pdf.drawRightString(width - 40, y, f"DISPATCH: {paper_str}")
+            pdf.setFillColor(colors.black)
+
         y -= 20
 
         # Summary info table

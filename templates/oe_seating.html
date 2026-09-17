@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Open Elective (OE) Seating - EPSILON{% endblock %}
+{% block page_heading %}Open Elective (OE) Exam Seating Arrangement{% endblock %}
+
+{% block content %}
+<form action="{{ url_for('auto_create_seating') }}" method="POST" id="oeSeatingForm">
+  <input type="hidden" name="allocation_type" value="OE">
+  <input type="hidden" name="left_entry_mode" value="oe">
+  <input type="hidden" name="right_entry_mode" value="oe">
+
+  <!-- Step 1: Exam Details -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:#0284c7; color:#fff; border-color:#0284c7;">1</span>
+      Exam Details & Scope Selection
+    </h3>
+
+    <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+      <div class="form-group">
+        <label for="academic_year">Academic Year <span style="color:var(--danger);">*</span></label>
+        <select id="academic_year" name="academic_year" class="form-select" required>
+          <option value="2026-2027" selected>2026-2027</option>
+          <option value="2025-2026">2025-2026</option>
+          <option value="2024-2025">2024-2025</option>
+          <option value="2027-2028">2027-2028</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="exam_name">Exam Type / Selection <span style="color:var(--danger);">*</span></label>
+        <select id="exam_name" name="exam_name" class="form-select" required>
+          <option value="CAE-I" selected>CAE-I</option>
+          <option value="CAE-II">CAE-II</option>
+          <option value="END SEMESTER">END SEMESTER</option>
+          <option value="MID SEMESTER">MID SEMESTER</option>
+          <option value="WINTER EXAM">WINTER EXAM</option>
+          <option value="SUMMER EXAM">SUMMER EXAM</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="exam_date">Exam Date <span style="color:var(--danger);">*</span></label>
+        <input type="date" id="exam_date" name="exam_date" class="form-control" value="{{ default_exam_date }}" required>
+      </div>
+    </div>
+
+    <!-- CA Exam Anti-Cheating Mode Toggle -->
+    <div style="background: #fff7ed; padding: 1rem; border-radius: 8px; border: 1px solid #ffedd5; margin-bottom: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <strong style="color: #c2410c; font-size: 0.9rem;">🛡️ CA / CAE OE Exam Anti-Cheating Interleaving Mode</strong>
+          <div style="font-size: 0.78rem; color: #9a3412;">Enforces strict cross-subject bench interleaving & row staggering for Open Elective exams.</div>
+        </div>
+        <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 700; color: #c2410c;">
+          <input type="checkbox" name="ca_anti_cheating" id="ca_anti_cheating" value="1" checked> Active (Strict Interleaving)
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Bench Seating Mode -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:#0284c7; color:#fff; border-color:#0284c7;">2</span>
+      Bench Seating Type
+    </h3>
+
+    <div class="radio-group">
+      <label class="radio-card active">
+        <input type="radio" name="bench_mode" id="bench_mode_double" value="DOUBLE" checked>
+        <div>
+          <strong>Double Side Seating (Pair 2 OE Subjects)</strong>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">Allocates Left OE Subject & Right OE Subject on each bench</div>
+        </div>
+      </label>
+
+      <label class="radio-card">
+        <input type="radio" name="bench_mode" id="bench_mode_single" value="SINGLE">
+        <div>
+          <strong>Single OE Subject Only</strong>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">Single student per bench (Skips Right Group)</div>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <!-- Step 3: Open Elective Subjects Selection -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:#0284c7; color:#fff; border-color:#0284c7;">3</span>
+      Open Elective Subject Datasets Selection
+    </h3>
+
+    <!-- Left Group OE Subject -->
+    <div style="background: #f0f9ff; padding: 1.25rem; border-radius: 8px; border: 1px solid #bae6fd; margin-bottom: 1.25rem;">
+      <h4 style="font-size: 0.95rem; font-weight: 700; color: #0369a1; margin-bottom: 0.75rem;">
+        Left Side OE Subject
+      </h4>
+      <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label for="left_oe_select">Select OE Subject from Dataset <span style="color:var(--danger);">*</span></label>
+          <select id="left_oe_select" class="form-select" onchange="document.getElementById('left_oe_subject').value=this.value">
+            <option value="">-- Choose OE Subject --</option>
+            {% for oe in oe_subjects %}
+              <option value="{{ oe.open_elective }}">{{ oe.open_elective }} ({% if oe.semester %}Sem {{ oe.semester }} - {% endif %}{{ oe.count }} students)</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="left_oe_subject">OR Type OE Subject Manually</label>
+          <input type="text" id="left_oe_subject" name="left_oe_subject" class="form-control" placeholder="e.g. Industry 4.0 or IPR" required>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Group OE Subject -->
+    <div id="right_oe_container" style="background: #f0fdf4; padding: 1.25rem; border-radius: 8px; border: 1px solid #bbf7d0;">
+      <h4 style="font-size: 0.95rem; font-weight: 700; color: #15803d; margin-bottom: 0.75rem;">
+        Right Side OE Subject
+      </h4>
+      <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label for="right_oe_select">Select OE Subject from Dataset</label>
+          <select id="right_oe_select" class="form-select" onchange="document.getElementById('right_oe_subject').value=this.value">
+            <option value="">-- Choose OE Subject --</option>
+            {% for oe in oe_subjects %}
+              <option value="{{ oe.open_elective }}">{{ oe.open_elective }} ({% if oe.semester %}Sem {{ oe.semester }} - {% endif %}{{ oe.count }} students)</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="right_oe_subject">OR Type OE Subject Manually</label>
+          <input type="text" id="right_oe_subject" name="right_oe_subject" class="form-control" placeholder="e.g. Cyber Security or Robotics">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Block & Rooms Selection -->
+  <div class="card">
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
+      <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:#0284c7; color:#fff; border-color:#0284c7;">4</span>
+      Classroom Block Selection
+    </h3>
+
+    <div class="form-group">
+      <label for="select_block">Select Target Block <span style="color:var(--danger);">*</span></label>
+      <select id="select_block" name="block" class="form-select" required onchange="loadBlockRooms(this.value)">
+        <option value="">-- Select Block --</option>
+        {% for b in blocks %}
+          <option value="{{ b }}">Block {{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div id="multi_room_group" style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 1rem;">
+      <label style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
+        Target Classrooms in Block:
+      </label>
+      <div id="multi_room_checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+        <span style="font-size: 0.82rem; color: var(--text-muted);">Select a block above to view classrooms.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 2rem;">
+    <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 1rem; background: #0284c7; border-color: #0284c7;">
+      <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Generate Open Elective Seating
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function loadBlockRooms(block) {
+    const multiBox = document.getElementById("multi_room_checkboxes");
+    if (!multiBox) return;
+    multiBox.innerHTML = '<span style="font-size: 0.82rem; color: var(--text-muted);">Loading rooms...</span>';
+
+    if (block) {
+      fetch(`/api/get_rooms?block=${encodeURIComponent(block)}`)
+        .then(res => res.json())
+        .then(rooms => {
+          multiBox.innerHTML = '';
+          rooms.forEach(r => {
+            const lbl = document.createElement("label");
+            lbl.style.cssText = "display:inline-flex; align-items:center; gap:0.35rem; background:#fff; padding:0.4rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:600;";
+            lbl.innerHTML = `<input type="checkbox" name="selected_rooms" value="${r.room_no}" checked> Room ${r.room_no} (${r.default_capacity} seats)`;
+            multiBox.appendChild(lbl);
+          });
+        });
+    }
+  }
+
+  document.getElementById("bench_mode_single")?.addEventListener("change", function() {
+    if (this.checked) {
+      document.getElementById("right_oe_container").style.display = "none";
+    }
+  });
+  document.getElementById("bench_mode_double")?.addEventListener("change", function() {
+    if (this.checked) {
+      document.getElementById("right_oe_container").style.display = "block";
+    }
+  });
+</script>
+{% endblock %}
