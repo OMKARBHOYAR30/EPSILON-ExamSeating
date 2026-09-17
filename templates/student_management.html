@@ -95,11 +95,11 @@
     <div class="card">
       <!-- Entry Mode Tabs -->
       <div class="nav-tabs-custom">
-        <button type="button" class="tab-btn active" onclick="switchTab('manual')">
-          <i class="fa-solid fa-keyboard"></i> Manual Typing
+        <button type="button" class="tab-btn active" onclick="switchTab('excel')">
+          <i class="fa-solid fa-file-excel"></i> Upload Excel Sheet
         </button>
-        <button type="button" class="tab-btn" onclick="switchTab('excel')">
-          <i class="fa-solid fa-file-excel"></i> Excel Import
+        <button type="button" class="tab-btn" onclick="switchTab('manual')">
+          <i class="fa-solid fa-keyboard"></i> Manual Typing
         </button>
         <button type="button" class="tab-btn" onclick="switchTab('single')">
           <i class="fa-solid fa-user-plus"></i> Single Add
@@ -109,8 +109,66 @@
         </button>
       </div>
 
-      <!-- TAB 1: Manual Roll Typing & Bulk Entry -->
-      <div id="tab-manual" class="tab-content active">
+      <!-- TAB 1: Excel / CSV Import (DEFAULT) -->
+      <div id="tab-excel" class="tab-content active">
+        <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-heading);">
+          Upload Exam Student Dataset (Excel / CSV)
+        </h3>
+
+        <form action="{{ url_for('import_students_excel_route') }}" method="POST" enctype="multipart/form-data">
+          <div class="file-dropzone" onclick="document.getElementById('excel_file').click()">
+            <i class="fa-solid fa-file-excel fa-2x" style="color: #16a34a; margin-bottom: 0.5rem;"></i>
+            <div style="font-weight: 600; font-size: 0.9rem;">Click to select Excel / CSV File</div>
+            <div id="file-name-display" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+              Columns: <strong>Roll No, Student Name, Branch, Semester, Section, Open Elective / Subject</strong>
+            </div>
+            <input type="file" id="excel_file" name="excel_file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="updateFileName(this)" required>
+          </div>
+
+          <div style="margin-top: 1rem; font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">Default Metadata (Used if missing in file):</div>
+          <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+            <div class="form-group">
+              <label>College</label>
+              <input type="text" name="default_college" class="form-control" value="GHRCE">
+            </div>
+            <div class="form-group">
+              <label>Program</label>
+              <input type="text" name="default_program" class="form-control" value="B.Tech">
+            </div>
+          </div>
+
+          <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem;">
+            <div class="form-group">
+              <label>Branch</label>
+              <input type="text" name="default_branch" class="form-control" placeholder="e.g. CE">
+            </div>
+            <div class="form-group">
+              <label>Sem</label>
+              <input type="text" name="default_semester" class="form-control" placeholder="e.g. 5">
+            </div>
+            <div class="form-group">
+              <label>Sec</label>
+              <input type="text" name="default_section" class="form-control" placeholder="e.g. A">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Default Subject / Open Elective</label>
+            <input type="text" name="default_oe" class="form-control" placeholder="e.g. Industry 4.0">
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.75rem; background: #16a34a; border-color: #16a34a;">
+            <i class="fa-solid fa-upload"></i> Upload & Import File
+          </button>
+        </form>
+
+        <a href="{{ url_for('reset_database_route') }}" class="btn btn-danger btn-sm" style="width: 100%; margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.4rem;" onclick="return confirm('Wipe all existing student records and clear database for a fresh dataset upload?');">
+          <i class="fa-solid fa-trash-can"></i> Clear All Existing Student Data
+        </a>
+      </div>
+
+      <!-- TAB 2: Manual Roll Typing -->
+      <div id="tab-manual" class="tab-content">
         <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-heading);">
           Bulk Manual Typing / Roll Entry
         </h3>
@@ -161,64 +219,6 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.75rem;">
-            <i class="fa-solid fa-floppy-disk"></i> Save Student Records
-          </button>
-        </form>
-      </div>
-
-      <!-- TAB 2: Excel / CSV Import -->
-      <div id="tab-excel" class="tab-content">
-        <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-heading);">
-          Import Students from Excel / CSV
-        </h3>
-
-        <form action="{{ url_for('import_students_excel_route') }}" method="POST" enctype="multipart/form-data">
-          <div class="file-dropzone" onclick="document.getElementById('excel_file').click()">
-            <i class="fa-solid fa-file-excel fa-2x" style="color: #16a34a; margin-bottom: 0.5rem;"></i>
-            <div style="font-weight: 600; font-size: 0.9rem;">Click to select Excel file (.xlsx, .csv)</div>
-            <div id="file-name-display" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-              Columns: Roll No, Name, Branch, Sem, Sec, <strong>Open Elective</strong>
-            </div>
-            <input type="file" id="excel_file" name="excel_file" accept=".xlsx, .xls, .csv" style="display: none;" onchange="updateFileName(this)" required>
-          </div>
-
-          <div style="margin-top: 1rem; font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">Default Metadata (Used if missing in file):</div>
-          <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
-            <div class="form-group">
-              <label>College</label>
-              <input type="text" name="default_college" class="form-control" value="GHRCE">
-            </div>
-            <div class="form-group">
-              <label>Program</label>
-              <input type="text" name="default_program" class="form-control" value="B.Tech">
-            </div>
-          </div>
-
-          <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem;">
-            <div class="form-group">
-              <label>Branch</label>
-              <input type="text" name="default_branch" class="form-control" placeholder="e.g. CE">
-            </div>
-            <div class="form-group">
-              <label>Sem</label>
-              <input type="text" name="default_semester" class="form-control" placeholder="e.g. 5">
-            </div>
-            <div class="form-group">
-              <label>Sec</label>
-              <input type="text" name="default_section" class="form-control" placeholder="e.g. A">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Default Open Elective (OE)</label>
-            <input type="text" name="default_oe" class="form-control" placeholder="e.g. IPR">
-          </div>
-
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.75rem; background: #16a34a; border-color: #16a34a;">
-            <i class="fa-solid fa-upload"></i> Upload & Import File
-          </button>
-        </form>
       </div>
 
       <!-- TAB 3: Add Single Student -->

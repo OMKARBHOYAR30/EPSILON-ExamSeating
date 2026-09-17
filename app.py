@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 
-from database.db import init_db, get_db
+from database.db import init_db, get_db, reset_database_data
 from modules.login_manager import authenticate_user, change_user_password
 from modules.room_manager import get_all_rooms, get_rooms_by_block, get_blocks, add_room, delete_room, get_room_details
 from modules.student_manager import (
@@ -351,6 +351,14 @@ def batch_update_oe_route():
     else:
         flash(msg, "danger")
 
+    return redirect(url_for("student_management"))
+
+
+@app.route("/reset_database")
+@login_required
+def reset_database_route():
+    reset_database_data()
+    flash("All existing student records and seating allocations wiped successfully. Database is clean for your new dataset upload!", "success")
     return redirect(url_for("student_management"))
 
 

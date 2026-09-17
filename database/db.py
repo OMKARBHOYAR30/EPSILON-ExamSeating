@@ -95,30 +95,17 @@ def init_db():
             )
         conn.commit()
 
-    # Seed sample section_students dataset if empty (includes OE subjects)
-    cur = conn.execute("SELECT COUNT(*) AS c FROM section_students")
-    if cur.fetchone()["c"] == 0:
-        # CE - Sem 5 - Sec A
-        ce_rolls = [r for r in range(101, 140) if r not in (104, 107, 110, 115, 122)]
-        for i, r in enumerate(ce_rolls):
-            oe = "IPR" if i < 15 else "Industry 4.0"
-            conn.execute(
-                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                ("GHRCE", "B.Tech", "CE", "5", "A", f"CE-{r}", f"Student CE-{r}", oe)
-            )
+    conn.close()
 
-        # IT - Sem 5 - Sec B
-        it_rolls = [r for r in range(201, 240) if r not in (203, 208, 214, 219, 225)]
-        for i, r in enumerate(it_rolls):
-            oe = "IPR" if i < 12 else "Cyber Security"
-            conn.execute(
-                """INSERT INTO section_students (college, program, branch, semester, section, roll_no, student_name, open_elective)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                ("GHRCE", "B.Tech", "IT", "5", "B", f"IT-{r}", f"Student IT-{r}", oe)
-            )
-        conn.commit()
 
+def reset_database_data():
+    """Wipe all student master records, seating allocations, and seating charts."""
+    conn = get_db()
+    conn.execute("DELETE FROM section_students")
+    conn.execute("DELETE FROM allocations")
+    conn.execute("DELETE FROM seating_chart")
+    conn.execute("DELETE FROM manual_rolls")
+    conn.commit()
     conn.close()
 
 
