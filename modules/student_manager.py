@@ -229,11 +229,39 @@ def add_section_students(college, program, branch, semester, section, raw_rolls_
     return True, f"Successfully saved {inserted} student records for {branch} Sem {semester} Sec {section}!"
 
 
+def _extract_field(row_dict, field_aliases, default_val=""):
+    """
+    Extracts a value from row_dict using a list of potential column header aliases.
+    Checks exact matches, lowercased matches, and normalized matches (removing non-alphanumerics).
+    """
+    # 1. Exact or direct lowercased key lookup
+    for alias in field_aliases:
+        alias_lower = alias.lower().strip()
+        if alias_lower in row_dict and row_dict[alias_lower] is not None and str(row_dict[alias_lower]).strip() != "":
+            return str(row_dict[alias_lower]).strip()
+    
+    # 2. Normalized lookup (removing spaces, underscores, dashes, dots, parens)
+    normalized_dict = {}
+    for k, v in row_dict.items():
+        if v is None:
+            continue
+        clean_k = ''.join(c for c in str(k).lower() if c.isalnum())
+        if clean_k and clean_k not in normalized_dict:
+            normalized_dict[clean_k] = str(v).strip()
+            
+    for alias in field_aliases:
+        clean_alias = ''.join(c for c in str(alias).lower() if c.isalnum())
+        if clean_alias in normalized_dict and normalized_dict[clean_alias] != "":
+            return normalized_dict[clean_alias]
+            
+    return default_val
+
+
 def import_students_from_excel(file_storage, default_college="GHRCE", default_program="B.Tech",
                               default_branch="", default_semester="", default_section="", default_oe=""):
     """
     Import student master records from Excel (.xlsx, .xls) or CSV file.
-    Supports columns: Roll No, Name / Student Name, College, Program, Branch, Semester, Section, Open Elective / OE / Elective / Subject, Status.
+    Supports columns: Roll No, Name / Student Name, College, Program, Branch, Semester, Section, Open Elective / Allotted Course / OE / Subject, Status.
     """
     filename = file_storage.filename.lower()
     records = []
@@ -285,21 +313,33 @@ def import_students_from_excel(file_storage, default_college="GHRCE", default_pr
     db = get_db()
     imported_count = 0
 
+    roll_aliases = ["roll_no", "roll no", "roll", "rollnumber", "roll_number", "roll_no.", "roll no.", "enrollment_no", "enrollment no", "student_id", "student id", "id_no", "id no", "registration_no", "reg_no"]
+    name_aliases = ["student_name", "student name", "name", "name of student", "name of the student", "candidate_name", "candidate name", "student", "full_name", "full name"]
+    college_aliases = ["college", "college name", "college_name", "institute", "institution"]
+    program_aliases = ["program", "course_program", "degree", "branch_program", "stream"]
+    branch_aliases = ["branch", "department", "dept", "discipline", "branch_name"]
+    semester_aliases = ["semester", "sem", "term", "year_sem"]
+    section_aliases = ["section", "sec", "class_section", "group"]
+    oe_aliases = [
+        "open_elective", "open elective", "oe", "allotted course", "allotted_course", "allottedcourse",
+        "allotted subject", "allotted_subject", "course", "course_name", "course name",
+        "course allocated", "allocated course", "elective", "elective_subject", "elective subject",
+        "subject", "subject_name", "subject name", "oe_subject", "oe subject", "oe_name", "oe name"
+    ]
+    status_aliases = ["status", "is_active", "active", "student_status"]
+
     for r in records:
-        roll_no = r.get("roll_no") or r.get("roll no") or r.get("roll") or r.get("rollnumber") or r.get("roll_number") or ""
-        student_name = r.get("student_name") or r.get("name") or r.get("student name") or f"Student {roll_no}"
-        college = r.get("college") or default_college
-        program = r.get("program") or default_program
-        branch = (r.get("branch") or default_branch).upper()
-        semester = str(r.get("semester") or default_semester)
-        section = (r.get("section") or default_section).upper()
+        roll_no = _extract_field(r, roll_aliases, "")
+        student_name = _extract_field(r, name_aliases, f"Student {roll_no}" if roll_no else "Unknown Student")
+        college = _extract_field(r, college_aliases, default_college)
+        program = _extract_field(r, program_aliases, default_program)
+        branch = _extract_field(r, branch_aliases, default_branch).upper()
+        semester = str(_extract_field(r, semester_aliases, default_semester))
+        section = _extract_field(r, section_aliases, default_section).upper()
 
-        open_elective = (
-            r.get("open_elective") or r.get("open elective") or r.get("oe") or 
-            r.get("elective") or r.get("elective_subject") or r.get("subject") or default_oe
-        ).strip()
+        open_elective = _extract_field(r, oe_aliases, default_oe)
 
-        status_val = str(r.get("status") or r.get("is_active") or "1").lower()
+        status_val = _extract_field(r, status_aliases, "1").lower()
         is_active = 0 if status_val in ("0", "false", "inactive", "left", "dropped") else 1
 
         if not roll_no or not branch or not semester or not section:
