@@ -17,7 +17,8 @@ from modules.room_manager import get_all_rooms, get_rooms_by_block, get_blocks, 
 from modules.student_manager import (
     get_all_student_sections, get_available_oe_subjects, get_students_filtered, get_students_for_section,
     add_single_student, add_section_students, import_students_from_excel,
-    update_student, toggle_student_status, delete_student, delete_section_dataset, batch_update_student_oe
+    update_student, toggle_student_status, delete_student, delete_section_dataset, batch_update_student_oe,
+    get_student_by_roll, update_student_info_by_roll
 )
 from modules.allocation_manager import (
     create_seating_allocation, auto_generate_multi_room_seating, get_all_allocations, get_recent_allocations,
@@ -359,6 +360,38 @@ def batch_update_oe_route():
 def reset_database_route():
     reset_database_data()
     flash("All existing student records and seating allocations wiped successfully. Database is clean for your new dataset upload!", "success")
+    return redirect(url_for("student_management"))
+
+
+@app.route("/api/get_student_by_roll")
+@login_required
+def api_get_student_by_roll():
+    roll_no = request.args.get("roll_no", "").strip()
+    branch = request.args.get("branch", "").strip()
+    semester = request.args.get("semester", "").strip()
+    student = get_student_by_roll(roll_no, branch, semester)
+    if student:
+        return jsonify({"success": True, "student": student})
+    return jsonify({"success": False, "message": "Student not found"}), 404
+
+
+@app.route("/update_student_by_roll", methods=["POST"])
+@login_required
+def update_student_by_roll_route():
+    roll_no = request.form.get("roll_no", "").strip()
+    student_name = request.form.get("student_name", "").strip()
+    branch = request.form.get("branch", "").strip()
+    semester = request.form.get("semester", "").strip()
+    section = request.form.get("section", "").strip()
+    open_elective = request.form.get("open_elective", "").strip()
+    is_active = request.form.get("is_active", 1)
+
+    success, msg = update_student_info_by_roll(roll_no, student_name, branch, semester, section, open_elective, is_active)
+    if success:
+        flash(msg, "success")
+    else:
+        flash(msg, "danger")
+
     return redirect(url_for("student_management"))
 
 

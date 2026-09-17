@@ -470,3 +470,60 @@ def batch_update_student_oe(college, branch, semester, section, rolls_oe_text):
     if updated_count > 0:
         return True, f"Successfully updated Open Elective subject for {updated_count} student records in {branch} Sem {semester} Sec {section}!"
     return False, f"No matching student records found in {branch} Sem {semester} Sec {section} to update."
+
+
+def get_student_by_roll(roll_no, branch=None, semester=None):
+    """Fetch single student record by Roll No (and optional branch/semester)."""
+    if not roll_no:
+        return None
+    db = get_db()
+    query = "SELECT * FROM section_students WHERE (roll_no = ? OR roll_no LIKE ?)"
+    params = [roll_no.strip(), f"%{roll_no.strip()}%"]
+
+    if branch and branch.strip():
+        query += " AND branch = ?"
+        params.append(branch.strip().upper())
+    if semester and str(semester).strip():
+        query += " AND semester = ?"
+        params.append(str(semester).strip())
+
+    query += " ORDER BY id LIMIT 1"
+    row = db.execute(query, params).fetchone()
+    db.close()
+    return dict(row) if row else None
+
+
+def update_student_info_by_roll(roll_no, student_name=None, branch=None, semester=None, section=None, open_elective=None, is_active=1):
+    """Updates student information directly by Roll No."""
+    if not roll_no:
+        return False, "Roll number is required."
+
+    db = get_db()
+    student = db.execute("SELECT id FROM section_students WHERE roll_no = ?", (roll_no.strip(),)).fetchone()
+    if not student:
+        db.close()
+        return False, f"Student record for Roll No '{roll_no}' not found."
+
+    cur = db.execute(
+        """UPDATE section_students 
+           SET student_name = COALESCE(?, student_name),
+               branch = COALESCE(?, branch),
+               semester = COALESCE(?, semester),
+               section = COALESCE(?, section),
+               open_elective = ?,
+               is_active = ?
+           WHERE id = ?""",
+        (
+            student_name.strip() if student_name else None,
+            branch.strip().upper() if branch else None,
+            str(semester).strip() if semester else None,
+            section.strip().upper() if section else None,
+            (open_elective or "").strip(),
+            int(is_active) if is_active is not None else 1,
+            student["id"]
+        )
+    )
+    db.commit()
+    affected = cur.rowcount > 0
+    db.close()
+    return affected, f"Student {roll_no} information & Open Elective updated successfully!" if affected else "Failed to update student record."

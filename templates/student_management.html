@@ -377,6 +377,58 @@
   <!-- Right Section: Master Database Student Records Directory -->
   <div class="card">
 
+    <!-- Quick Roll No Student Info & OE Editor Card -->
+    <div style="background: #f0f9ff; padding: 1.25rem; border-radius: 8px; border: 1px solid #bae6fd; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 0.95rem; font-weight: 700; color: #0369a1; margin-bottom: 0.75rem;">
+        <i class="fa-solid fa-bolt" style="color: #0284c7;"></i> Quick Student Info & Open Elective Editor (by Roll No / Branch / Sem)
+      </h3>
+
+      <form action="{{ url_for('update_student_by_roll_route') }}" method="POST">
+        <div class="form-row" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 0.5rem; align-items: flex-end;">
+          <div class="form-group" style="margin: 0;">
+            <label style="font-size: 0.78rem; font-weight: 700;">Roll Number <span style="color:var(--danger);">*</span></label>
+            <input type="text" id="quick_roll_no" name="roll_no" class="form-control" placeholder="e.g. CE-101" required onkeyup="lookupStudentByRoll()">
+          </div>
+
+          <div class="form-group" style="margin: 0;">
+            <label style="font-size: 0.78rem; font-weight: 700;">Branch</label>
+            <input type="text" id="quick_branch" name="branch" class="form-control" placeholder="e.g. CE">
+          </div>
+
+          <div class="form-group" style="margin: 0;">
+            <label style="font-size: 0.78rem; font-weight: 700;">Sem</label>
+            <input type="text" id="quick_sem" name="semester" class="form-control" placeholder="e.g. 5">
+          </div>
+
+          <div class="form-group" style="margin: 0;">
+            <label style="font-size: 0.78rem; font-weight: 700;">Section</label>
+            <input type="text" id="quick_sec" name="section" class="form-control" placeholder="e.g. A">
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1.5fr 2fr 1fr; gap: 0.5rem; margin-top: 0.65rem; align-items: flex-end;">
+          <div class="form-group" style="margin: 0;">
+            <label style="font-size: 0.78rem; font-weight: 700;">Student Name</label>
+            <input type="text" id="quick_name" name="student_name" class="form-control" placeholder="Student Full Name">
+          </div>
+
+          <div class="form-group" style="margin: 0;">
+            <label style="font-size: 0.78rem; font-weight: 700; color: #0284c7;">Open Elective (OE) Subject</label>
+            <input type="text" id="quick_oe" name="open_elective" class="form-control" placeholder="e.g. Industry 4.0 or IPR">
+          </div>
+
+          <div>
+            <button type="submit" class="btn btn-primary btn-sm" style="width: 100%; height: 38px; background: #0284c7; border-color: #0284c7; font-weight: 700;">
+              <i class="fa-solid fa-floppy-disk"></i> Save Info
+            </button>
+          </div>
+        </div>
+        <div id="quick_lookup_msg" style="font-size: 0.75rem; margin-top: 0.35rem; color: var(--text-muted);">
+          Type Roll No above to instantly auto-fill student details.
+        </div>
+      </form>
+    </div>
+
     <!-- Filters & Search Toolbar -->
     <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
       <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; flex: 1;">
@@ -587,6 +639,38 @@
     document.getElementById('edit_is_active').value = isActive;
 
     document.getElementById('editStudentModal').classList.add('active');
+  }
+
+  let lookupTimeout = null;
+  function lookupStudentByRoll() {
+    clearTimeout(lookupTimeout);
+    const roll = document.getElementById('quick_roll_no').value.trim();
+    const branch = document.getElementById('quick_branch').value.trim();
+    const sem = document.getElementById('quick_sem').value.trim();
+    const msg = document.getElementById('quick_lookup_msg');
+
+    if (!roll) {
+      if (msg) msg.textContent = 'Type Roll No above to instantly auto-fill student details.';
+      return;
+    }
+
+    lookupTimeout = setTimeout(() => {
+      fetch(`/api/get_student_by_roll?roll_no=${encodeURIComponent(roll)}&branch=${encodeURIComponent(branch)}&semester=${encodeURIComponent(sem)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.student) {
+            const s = data.student;
+            document.getElementById('quick_name').value = s.student_name || '';
+            document.getElementById('quick_branch').value = s.branch || '';
+            document.getElementById('quick_sem').value = s.semester || '';
+            document.getElementById('quick_sec').value = s.section || '';
+            document.getElementById('quick_oe').value = s.open_elective || '';
+            if (msg) msg.innerHTML = `<span style="color:#16a34a; font-weight:600;"><i class="fa-solid fa-circle-check"></i> Found student ${s.roll_no} (${s.branch} Sem ${s.semester} Sec ${s.section})</span>`;
+          } else {
+            if (msg) msg.innerHTML = `<span style="color:#d97706;"><i class="fa-solid fa-magnifying-glass"></i> Student Roll No '${roll}' not found in DB yet.</span>`;
+          }
+        });
+    }, 200);
   }
 
   function closeEditModal() {
