@@ -201,6 +201,26 @@
       </div>
     </div>
 
+    <!-- Paper Distribution Assignment Mode -->
+    <div style="background: #f8fafc; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-top: 0.75rem;">
+      <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.4rem;">
+        Paper Distribution Assignment Mode:
+      </label>
+      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #1e293b;">
+          <input type="radio" name="left_paper_dist_mode" id="left_dist_section" value="section" checked onchange="updateLeftPaperDistSummary()"> 
+          📋 <strong>Section-wise</strong> (Class & Roll No Range)
+        </label>
+        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #0284c7;">
+          <input type="radio" name="left_paper_dist_mode" id="left_dist_oe" value="oe" onchange="updateLeftPaperDistSummary()"> 
+          📖 <strong>Open Elective-wise</strong> (By Enrolled OE Subject)
+        </label>
+      </div>
+      <div id="left_paper_dist_summary_box" style="margin-top: 0.4rem; font-size: 0.82rem; padding: 0.4rem 0.65rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #334155;">
+        <!-- Live summary preview -->
+      </div>
+    </div>
+
     <!-- Roll Entry Selection Method -->
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
       <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
@@ -276,6 +296,26 @@
       <div class="form-group">
         <label for="right_semester">Semester</label>
         <input type="text" id="right_semester" name="right_semester" class="form-control" placeholder="e.g. 5" value="5" oninput="loadRightDatasetPreview()">
+      </div>
+    </div>
+
+    <!-- Paper Distribution Assignment Mode -->
+    <div style="background: #f8fafc; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-top: 0.75rem;">
+      <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.4rem;">
+        Paper Distribution Assignment Mode:
+      </label>
+      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #1e293b;">
+          <input type="radio" name="right_paper_dist_mode" id="right_dist_section" value="section" checked onchange="updateRightPaperDistSummary()"> 
+          📋 <strong>Section-wise</strong> (Class & Roll No Range)
+        </label>
+        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #059669;">
+          <input type="radio" name="right_paper_dist_mode" id="right_dist_oe" value="oe" onchange="updateRightPaperDistSummary()"> 
+          📖 <strong>Open Elective-wise</strong> (By Enrolled OE Subject)
+        </label>
+      </div>
+      <div id="right_paper_dist_summary_box" style="margin-top: 0.4rem; font-size: 0.82rem; padding: 0.4rem 0.65rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #334155;">
+        <!-- Live summary preview -->
       </div>
     </div>
 
@@ -502,6 +542,56 @@
       });
   }
 
+  function updateLeftPaperDistSummary() {
+    const isSectionMode = document.getElementById("left_dist_section")?.checked;
+    const sec = document.getElementById("left_section")?.value || "A";
+    const branch = document.getElementById("left_branch")?.value || "CE";
+    const sem = document.getElementById("left_semester")?.value || "5";
+    const count = document.getElementById("left_dataset_count")?.value || 15;
+    const box = document.getElementById("left_paper_dist_summary_box");
+
+    if (!box) return;
+
+    if (isSectionMode) {
+      box.innerHTML = `
+        <div style="color: #1e293b; font-weight:700;">Section-wise Distribution:</div>
+        <div>Section: <strong>${sec}</strong> (${branch} Sem ${sem}) | Students/Papers: <strong>${count}</strong></div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Calculates total papers required for this section's roll-number range.</div>
+      `;
+    } else {
+      box.innerHTML = `
+        <div style="color: #0284c7; font-weight:700;">Open Elective-wise Distribution:</div>
+        <div>Identifies enrolled OE subjects for ${branch} Sem ${sem} Sec ${sec} students (Total: <strong>${count} Papers</strong>)</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Assigns papers according to each student's allocated Open Elective subject.</div>
+      `;
+    }
+  }
+
+  function updateRightPaperDistSummary() {
+    const isSectionMode = document.getElementById("right_dist_section")?.checked;
+    const sec = document.getElementById("right_section")?.value || "B";
+    const branch = document.getElementById("right_branch")?.value || "IT";
+    const sem = document.getElementById("right_semester")?.value || "5";
+    const count = document.getElementById("right_dataset_count")?.value || 15;
+    const box = document.getElementById("right_paper_dist_summary_box");
+
+    if (!box) return;
+
+    if (isSectionMode) {
+      box.innerHTML = `
+        <div style="color: #1e293b; font-weight:700;">Section-wise Distribution:</div>
+        <div>Section: <strong>${sec}</strong> (${branch} Sem ${sem}) | Students/Papers: <strong>${count}</strong></div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Calculates total papers required for this section's roll-number range.</div>
+      `;
+    } else {
+      box.innerHTML = `
+        <div style="color: #059669; font-weight:700;">Open Elective-wise Distribution:</div>
+        <div>Identifies enrolled OE subjects for ${branch} Sem ${sem} Sec ${sec} students (Total: <strong>${count} Papers</strong>)</div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Assigns papers according to each student's allocated Open Elective subject.</div>
+      `;
+    }
+  }
+
   document.getElementById("bench_mode_single")?.addEventListener("change", function() {
     if (this.checked) {
       document.getElementById("right_group_container").style.display = "none";
@@ -517,6 +607,8 @@
   document.addEventListener("DOMContentLoaded", function() {
     loadLeftDatasetPreview();
     loadRightDatasetPreview();
+    updateLeftPaperDistSummary();
+    updateRightPaperDistSummary();
   });
 </script>
 {% endblock %}

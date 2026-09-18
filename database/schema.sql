@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS allocations (
     left_roll_from     INTEGER DEFAULT 0,
     left_roll_to       INTEGER DEFAULT 0,
     left_entry_mode    TEXT DEFAULT 'auto', -- 'auto' / 'manual' / 'dataset' / 'oe'
+    left_paper_dist_mode TEXT DEFAULT 'section', -- 'section' (Class-wise) / 'oe' (Open Elective-wise)
     
     -- Right Group
     right_college      TEXT DEFAULT '',
@@ -83,7 +84,8 @@ CREATE TABLE IF NOT EXISTS allocations (
     right_roll_prefix  TEXT DEFAULT '',
     right_roll_from    INTEGER DEFAULT 0,
     right_roll_to      INTEGER DEFAULT 0,
-    right_entry_mode   TEXT DEFAULT 'auto', -- 'auto' / 'manual' / 'dataset' / 'oe'
+    right_entry_mode   TEXT DEFAULT 'auto',
+    right_paper_dist_mode TEXT DEFAULT 'section', -- 'auto' / 'manual' / 'dataset' / 'oe'
     
     created_at         TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );

@@ -56,6 +56,12 @@ def init_db():
     if "right_oe_subject" not in cols:
         conn.execute("ALTER TABLE allocations ADD COLUMN right_oe_subject TEXT DEFAULT ''")
         conn.commit()
+    if "left_paper_dist_mode" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN left_paper_dist_mode TEXT DEFAULT 'section'")
+        conn.commit()
+    if "right_paper_dist_mode" not in cols:
+        conn.execute("ALTER TABLE allocations ADD COLUMN right_paper_dist_mode TEXT DEFAULT 'section'")
+        conn.commit()
 
     # Create performance indexes after column migrations
     conn.execute("CREATE INDEX IF NOT EXISTS idx_section_students_sec ON section_students(college, branch, semester, section, is_active)")

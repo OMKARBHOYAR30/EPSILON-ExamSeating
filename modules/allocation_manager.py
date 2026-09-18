@@ -158,8 +158,7 @@ def get_recent_allocations(limit=5):
 
 def get_allocation_paper_count_breakdown(allocation_id):
     """
-    Calculates the exact count of question papers required per subject/OE subject for a room allocation.
-    Returns list of dicts: [{'subject': 'Industry 4.0', 'count': 10}, ...]
+    Calculates exact paper distribution count according to Section-wise or Open Elective-wise options.
     """
     db = get_db()
     allocation = db.execute("SELECT * FROM allocations WHERE id = ?", (allocation_id,)).fetchone()
@@ -172,44 +171,61 @@ def get_allocation_paper_count_breakdown(allocation_id):
         (allocation_id,)
     ).fetchall()
 
-    rolls = []
-    for r in chart_rows:
-        if r["left_student"] and r["left_student"].strip():
-            rolls.append(r["left_student"].strip())
-        if r["right_student"] and r["right_student"].strip():
-            rolls.append(r["right_student"].strip())
+    left_rolls = [r["left_student"].strip() for r in chart_rows if r["left_student"] and r["left_student"].strip()]
+    right_rolls = [r["right_student"].strip() for r in chart_rows if r["right_student"] and r["right_student"].strip()]
+    all_rolls = left_rolls + right_rolls
 
-    if not rolls:
+    if not all_rolls:
         db.close()
         return []
 
-    placeholders = ",".join(["?"] * len(rolls))
+    placeholders = ",".join(["?"] * len(all_rolls))
     students = db.execute(
-        f"SELECT roll_no, branch, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
-        rolls
+        f"SELECT roll_no, branch, section, semester, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
+        all_rolls
     ).fetchall()
     db.close()
 
     student_map = {s["roll_no"]: s for s in students}
-    subject_counts = {}
 
-    left_default_branch = allocation["left_branch"] or "Regular Exam Paper"
+    left_dist_mode = allocation.get("left_paper_dist_mode") or "section"
+    right_dist_mode = allocation.get("right_paper_dist_mode") or "section"
 
-    for r_no in rolls:
-        stud = student_map.get(r_no)
-        sub = ""
+    if allocation.get("allocation_type") == "OE":
+        left_dist_mode = "oe"
+        right_dist_mode = "oe"
 
-        if stud and stud.get("open_elective") and stud["open_elective"].strip():
-            sub = stud["open_elective"].strip()
-        elif stud and stud.get("branch") and stud["branch"].strip():
-            sub = f"{stud['branch'].strip()} Paper"
+    paper_counts = {}
 
-        if not sub:
-            sub = left_default_branch
+    # Left Group Calculation
+    if left_rolls:
+        if left_dist_mode == "oe":
+            for r_no in left_rolls:
+                stud = student_map.get(r_no)
+                oe_sub = (stud.get("open_elective") if stud else "") or allocation.get("left_oe_subject") or "Open Elective"
+                key = f"OE: {oe_sub.strip()}"
+                paper_counts[key] = paper_counts.get(key, 0) + 1
+        else:
+            sec_name = f"Section {allocation['left_section']} ({allocation['left_branch']} Sem {allocation['left_semester']})" if allocation.get("left_section") else f"{allocation['left_branch']} Paper"
+            roll_range = f"Rolls {left_rolls[0]} to {left_rolls[-1]}" if len(left_rolls) > 1 else f"Roll {left_rolls[0]}"
+            key = f"{sec_name} [{roll_range}]"
+            paper_counts[key] = len(left_rolls)
 
-        subject_counts[sub] = subject_counts.get(sub, 0) + 1
+    # Right Group Calculation
+    if right_rolls:
+        if right_dist_mode == "oe":
+            for r_no in right_rolls:
+                stud = student_map.get(r_no)
+                oe_sub = (stud.get("open_elective") if stud else "") or allocation.get("right_oe_subject") or "Open Elective"
+                key = f"OE: {oe_sub.strip()}"
+                paper_counts[key] = paper_counts.get(key, 0) + 1
+        else:
+            sec_name = f"Section {allocation['right_section']} ({allocation['right_branch']} Sem {allocation['right_semester']})" if allocation.get("right_section") else f"{allocation['right_branch']} Paper"
+            roll_range = f"Rolls {right_rolls[0]} to {right_rolls[-1]}" if len(right_rolls) > 1 else f"Roll {right_rolls[0]}"
+            key = f"{sec_name} [{roll_range}]"
+            paper_counts[key] = paper_counts.get(key, 0) + len(right_rolls)
 
-    result = [{"subject": k, "count": v} for k, v in subject_counts.items()]
+    result = [{"subject": k, "count": v} for k, v in paper_counts.items()]
     result.sort(key=lambda x: x["count"], reverse=True)
     return result
 
@@ -418,6 +434,9 @@ def create_seating_allocation(data):
             raw_auto_r = [f"{right_roll_prefix}{i}" for i in range(right_roll_from, right_roll_to + 1)]
             right_students = [r for r in raw_auto_r if r not in already_allocated_rolls]
 
+    left_paper_dist_mode = data.get("left_paper_dist_mode", "section").strip().lower()
+    right_paper_dist_mode = data.get("right_paper_dist_mode", "section").strip().lower()
+
     used_capacity = max(len(left_students), len(right_students))
     if used_capacity > total_benches:
         used_capacity = total_benches
@@ -427,16 +446,16 @@ def create_seating_allocation(data):
         """INSERT INTO allocations (
             room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name, allocation_type,
             left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
-            left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
+            left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode, left_paper_dist_mode,
             right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
-            right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode, right_paper_dist_mode
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name, allocation_type,
             left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
-            left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
+            left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode, left_paper_dist_mode,
             right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
-            right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
+            right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode, right_paper_dist_mode
         )
     )
     allocation_id = cur.lastrowid
@@ -598,20 +617,23 @@ def auto_generate_multi_room_seating(data):
 
         used_cap = max(len(r_left_chunk), len(r_right_chunk))
 
+        left_paper_dist_mode = data.get("left_paper_dist_mode", "section").strip().lower()
+        right_paper_dist_mode = data.get("right_paper_dist_mode", "section").strip().lower()
+
         cur = db.execute(
             """INSERT INTO allocations (
                 room_no, block, used_capacity, rows, row_layout, bench_mode, exam_date, academic_year, exam_name, allocation_type,
                 left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
-                left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode,
+                left_roll_prefix, left_roll_from, left_roll_to, left_entry_mode, left_paper_dist_mode,
                 right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
-                right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                right_roll_prefix, right_roll_from, right_roll_to, right_entry_mode, right_paper_dist_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 r_no, block, used_cap, rows, room["default_row_layout"], bench_mode, exam_date, academic_year, exam_name, allocation_type,
                 left_college, left_program, left_branch, left_semester, left_section, left_oe_subject,
-                left_roll_prefix, 1, len(r_left_chunk), left_entry_mode,
+                left_roll_prefix, 1, len(r_left_chunk), left_entry_mode, left_paper_dist_mode,
                 right_college, right_program, right_branch, right_semester, right_section, right_oe_subject,
-                right_roll_prefix, 1, len(r_right_chunk), right_entry_mode
+                right_roll_prefix, 1, len(r_right_chunk), right_entry_mode, right_paper_dist_mode
             )
         )
         alloc_id = cur.lastrowid
