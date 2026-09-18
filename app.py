@@ -411,9 +411,7 @@ def new_seating():
 @app.route("/oe_seating")
 @login_required
 def oe_seating():
-    blocks = get_blocks()
-    oe_subjects = get_available_oe_subjects()
-    return render_template("oe_seating.html", active_page="oe_seating", blocks=blocks, oe_subjects=oe_subjects)
+    return redirect(url_for("new_seating"))
 
 
 @app.route("/create_seating", methods=["POST"])

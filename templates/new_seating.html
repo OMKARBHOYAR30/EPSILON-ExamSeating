@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}New Seating Arrangement - EPSILON{% endblock %}
-{% block page_heading %}Create New Exam Seating Arrangement{% endblock %}
+{% block title %}Seating Arrangement Generator - EPSILON{% endblock %}
+{% block page_heading %}Exam Seating Arrangement Generator{% endblock %}
 
 {% block content %}
 <form action="{{ url_for('create_seating') }}" method="POST" id="seatingForm">
 
-  <!-- Step 1: Select Allocation Mode, Academic Year, Exam Selection, Exam Date & Classroom -->
+  <!-- Step 1: Select Allocation Category, Exam Details, Scope & Classroom -->
   <div class="card">
     <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1.25rem;">
       <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">1</span>
-      Exam Details & Allocation Mode Selection
+      Exam Details & Scope Selection
     </h3>
 
-    <!-- Allocation Type Selection (Regular Section vs Open Elective OE) -->
+    <!-- Allocation Category (Regular Section vs OE Paper Exam) -->
     <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
       <label style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
         Choose Seating Allocation Category:
@@ -22,7 +22,7 @@
         <label class="radio-card active">
           <input type="radio" name="allocation_type" id="alloc_type_section" value="SECTION" checked>
           <div>
-            <strong>🏢 Regular Section Allocation</strong>
+            <strong>🏢 Regular Section Exam Allocation</strong>
             <div style="font-size: 0.78rem; color: var(--text-muted);">Allocate by Branch, Semester & Section (e.g. CE Sem 5 Sec A)</div>
           </div>
         </label>
@@ -30,8 +30,8 @@
         <label class="radio-card">
           <input type="radio" name="allocation_type" id="alloc_type_oe" value="OE">
           <div>
-            <strong>📖 Open Elective (OE) Exam Allocation</strong>
-            <div style="font-size: 0.78rem; color: var(--text-muted);">Allocate by OE Subject across ALL branches (e.g. IPR, Industry 4.0)</div>
+            <strong>📖 OE Paper / Open Elective Exam Allocation</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">Tracks individual OE subjects & generates Room Paper Dispatch breakdown</div>
           </div>
         </label>
       </div>
@@ -80,14 +80,12 @@
           <div style="font-size: 0.78rem; color: #9a3412;">Enforces strict cross-subject bench interleaving & row staggering for Continuous Assessment exams.</div>
         </div>
         <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 700; color: #c2410c;">
-          <input type="checkbox" name="ca_anti_cheating" id="ca_anti_cheating" value="1" checked onchange="validateCAExamRules()"> Active (Strict Anti-Cheating)
+          <input type="checkbox" name="ca_anti_cheating" id="ca_anti_cheating" value="1" checked> Active (Strict Anti-Cheating)
         </label>
-      </div>
-      <div id="ca_warning_banner" style="display: none; margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; color: #991b1b; font-size: 0.82rem; font-weight: 600;">
-        <i class="fa-solid fa-triangle-exclamation"></i> CA Exam Anti-Cheating Warning: Left Group and Right Group MUST be different branches or OE subjects so adjacent students receive different exam papers!
       </div>
     </div>
 
+    <!-- Target Scope Radio -->
     <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
       <label style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
         Target Allocation Scope:
@@ -97,7 +95,7 @@
           <input type="radio" name="allocation_scope" id="scope_single" value="single" checked onchange="toggleAllocationScopeUI()"> 📌 Single Room Mode
         </label>
         <label style="cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: var(--primary);">
-          <input type="radio" name="allocation_scope" id="scope_multi" value="multi" onchange="toggleAllocationScopeUI()"> ⚡ Auto Multi-Room Generator (Seat Whole Class/OE Dataset)
+          <input type="radio" name="allocation_scope" id="scope_multi" value="multi" onchange="toggleAllocationScopeUI()"> ⚡ Auto Multi-Room Generator (Seat Whole Class Dataset)
         </label>
       </div>
     </div>
@@ -105,7 +103,7 @@
     <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
       <div class="form-group">
         <label for="select_block">Select Block <span style="color:var(--danger);">*</span></label>
-        <select id="select_block" name="block" class="form-select" required>
+        <select id="select_block" name="block" class="form-select" required onchange="loadBlockRooms(this.value)">
           <option value="">-- Select Block --</option>
           {% for b in blocks %}
             <option value="{{ b }}">Block {{ b }}</option>
@@ -115,10 +113,9 @@
 
       <div class="form-group" id="single_room_group">
         <label for="select_room">Choose Single Room <span style="color:var(--danger);">*</span></label>
-        <select id="select_room" name="room_no" class="form-select">
+        <select id="select_room" name="room_no" class="form-select" onchange="onRoomChange()">
           <option value="">-- Choose Block First --</option>
         </select>
-        <input type="hidden" id="selected_block_input" name="block_hidden" value="">
       </div>
     </div>
 
@@ -175,7 +172,7 @@
       Left Group Details
     </h3>
 
-    <div class="form-row" id="left_section_row">
+    <div class="form-row" id="left_section_row" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem;">
       <div class="form-group">
         <label for="left_college">College</label>
         <input type="text" id="left_college" name="left_college" class="form-control" placeholder="e.g. GHRCE" required value="GHRCE">
@@ -188,31 +185,19 @@
 
       <div class="form-group">
         <label for="left_branch">Branch</label>
-        <input type="text" id="left_branch" name="left_branch" class="form-control" placeholder="e.g. CE" required value="CE">
+        <input type="text" id="left_branch" name="left_branch" class="form-control" placeholder="e.g. CE" required value="CE" oninput="loadLeftDatasetPreview()">
       </div>
 
       <div class="form-group">
         <label for="left_section">Section</label>
-        <input type="text" id="left_section" name="left_section" class="form-control" placeholder="e.g. A" required value="A">
+        <input type="text" id="left_section" name="left_section" class="form-control" placeholder="e.g. A" required value="A" oninput="loadLeftDatasetPreview()">
       </div>
     </div>
 
-    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+    <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
       <div class="form-group">
         <label for="left_semester">Semester</label>
-        <input type="text" id="left_semester" name="left_semester" class="form-control" placeholder="e.g. 5" required value="5">
-      </div>
-
-      <!-- Left OE Subject Selection (Visible in OE Mode) -->
-      <div class="form-group" id="left_oe_inputs" style="display: none;">
-        <label for="left_oe_subject">Select Open Elective (OE) Subject <span style="color:var(--danger);">*</span></label>
-        <select id="left_oe_subject" name="left_oe_subject" class="form-select">
-          <option value="">-- Choose OE Subject --</option>
-          {% for oe in oe_subjects %}
-            <option value="{{ oe.open_elective }}">{{ oe.open_elective }} (Sem {{ oe.semester }} - {{ oe.count }} students)</option>
-          {% endfor %}
-        </select>
-        <span class="form-hint">Aggregates students taking this OE across ALL branches</span>
+        <input type="text" id="left_semester" name="left_semester" class="form-control" placeholder="e.g. 5" required value="5" oninput="loadLeftDatasetPreview()">
       </div>
     </div>
 
@@ -220,14 +205,11 @@
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
       <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
       <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-        <label style="display: none; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #0284c7;">
-          <input type="radio" name="left_entry_mode" id="left_mode_oe" value="oe"> Open Elective Subject (Cross-Branch)
-        </label>
         <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: var(--primary);">
-          <input type="radio" name="left_entry_mode" id="left_mode_dataset" value="dataset" checked> Student Master Database (Active Students)
+          <input type="radio" name="left_entry_mode" id="left_mode_dataset" value="dataset" checked onchange="toggleLeftModeUI('dataset')"> Student Master Database (Active Students)
         </label>
         <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-          <input type="radio" name="left_entry_mode" id="left_mode_manual" value="manual"> Manual Roll Entry
+          <input type="radio" name="left_entry_mode" id="left_mode_manual" value="manual" onchange="toggleLeftModeUI('manual')"> Manual Roll Entry
         </label>
       </div>
 
@@ -268,7 +250,7 @@
       Right Group Details
     </h3>
 
-    <div class="form-row" id="right_section_row">
+    <div class="form-row" id="right_section_row" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem;">
       <div class="form-group">
         <label for="right_college">College</label>
         <input type="text" id="right_college" name="right_college" class="form-control" placeholder="e.g. GHRCE" value="GHRCE">
@@ -281,31 +263,19 @@
 
       <div class="form-group">
         <label for="right_branch">Branch</label>
-        <input type="text" id="right_branch" name="right_branch" class="form-control" placeholder="e.g. IT" value="IT">
+        <input type="text" id="right_branch" name="right_branch" class="form-control" placeholder="e.g. IT" value="IT" oninput="loadRightDatasetPreview()">
       </div>
 
       <div class="form-group">
         <label for="right_section">Section</label>
-        <input type="text" id="right_section" name="right_section" class="form-control" placeholder="e.g. B" value="B">
+        <input type="text" id="right_section" name="right_section" class="form-control" placeholder="e.g. B" value="B" oninput="loadRightDatasetPreview()">
       </div>
     </div>
 
-    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+    <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
       <div class="form-group">
         <label for="right_semester">Semester</label>
-        <input type="text" id="right_semester" name="right_semester" class="form-control" placeholder="e.g. 5" value="5">
-      </div>
-
-      <!-- Right OE Subject Selection (Visible in OE Mode) -->
-      <div class="form-group" id="right_oe_inputs" style="display: none;">
-        <label for="right_oe_subject">Select Open Elective (OE) Subject <span style="color:var(--danger);">*</span></label>
-        <select id="right_oe_subject" name="right_oe_subject" class="form-select">
-          <option value="">-- Choose OE Subject --</option>
-          {% for oe in oe_subjects %}
-            <option value="{{ oe.open_elective }}">{{ oe.open_elective }} (Sem {{ oe.semester }} - {{ oe.count }} students)</option>
-          {% endfor %}
-        </select>
-        <span class="form-hint">Aggregates students taking this OE across ALL branches</span>
+        <input type="text" id="right_semester" name="right_semester" class="form-control" placeholder="e.g. 5" value="5" oninput="loadRightDatasetPreview()">
       </div>
     </div>
 
@@ -313,14 +283,11 @@
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
       <label style="font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; display: block;">Student Selection Source</label>
       <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-        <label style="display: none; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #0284c7;">
-          <input type="radio" name="right_entry_mode" id="right_mode_oe" value="oe"> Open Elective Subject (Cross-Branch)
-        </label>
         <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight:600; color: #059669;">
-          <input type="radio" name="right_entry_mode" id="right_mode_dataset" value="dataset" checked> Student Master Database (Active Students)
+          <input type="radio" name="right_entry_mode" id="right_mode_dataset" value="dataset" checked onchange="toggleRightModeUI('dataset')"> Student Master Database (Active Students)
         </label>
         <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
-          <input type="radio" name="right_entry_mode" id="right_mode_manual" value="manual"> Manual Roll Entry
+          <input type="radio" name="right_entry_mode" id="right_mode_manual" value="manual" onchange="toggleRightModeUI('manual')"> Manual Roll Entry
         </label>
       </div>
 
@@ -356,28 +323,200 @@
 
   <!-- Submit Button -->
   <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 2rem;">
-    <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 1rem;">
-      <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Seating Arrangement
+    <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2.25rem; font-size: 1rem;">
+      <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Seating & Room Paper Breakdown
     </button>
   </div>
 
 </form>
+{% endblock %}
 
-<!-- Duplicate Room Modal -->
-<div class="modal-overlay" id="duplicateModal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3 class="modal-title" style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Duplicate Allocation Warning</h3>
-    </div>
-    <div class="modal-body">
-      This room already has a seating allocation for the selected date.
-      <br><br>
-      <strong>Do you want to create another allocation for this room on the same date?</strong>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" id="btnDuplicateNo">No</button>
-      <button type="button" class="btn btn-danger" id="btnDuplicateYes">Yes</button>
-    </div>
-  </div>
-</div>
+{% block extra_js %}
+<script>
+  function loadBlockRooms(block) {
+    const selectRoom = document.getElementById("select_room");
+    const multiBox = document.getElementById("multi_room_checkboxes");
+    const roomInfoCard = document.getElementById("room_info_card");
+
+    if (!selectRoom || !multiBox) return;
+
+    if (!block) {
+      selectRoom.innerHTML = '<option value="">-- Choose Block First --</option>';
+      multiBox.innerHTML = '<span style="font-size: 0.82rem; color: var(--text-muted);">Please select a Block above to load available rooms.</span>';
+      if (roomInfoCard) roomInfoCard.style.display = 'none';
+      return;
+    }
+
+    selectRoom.innerHTML = '<option value="">Loading rooms...</option>';
+    multiBox.innerHTML = '<span style="font-size: 0.82rem; color: var(--text-muted);">Loading rooms...</span>';
+
+    fetch(`/api/get_rooms?block=${encodeURIComponent(block)}`)
+      .then(res => res.json())
+      .then(rooms => {
+        selectRoom.innerHTML = '<option value="">-- Choose Room --</option>';
+        multiBox.innerHTML = '';
+
+        if (!rooms || rooms.length === 0) {
+          selectRoom.innerHTML = '<option value="">No rooms found in Block</option>';
+          multiBox.innerHTML = '<span style="font-size: 0.82rem; color: var(--danger);">No rooms found in this block.</span>';
+          return;
+        }
+
+        rooms.forEach(r => {
+          // Single Room Dropdown option
+          const opt = document.createElement("option");
+          opt.value = r.room_no;
+          opt.dataset.capacity = r.default_capacity;
+          opt.dataset.rows = r.rows || '-';
+          opt.dataset.layout = r.default_row_layout || '-';
+          opt.textContent = `Room ${r.room_no} (Capacity ${r.default_capacity} seats)`;
+          selectRoom.appendChild(opt);
+
+          // Multi Room Checkbox
+          const lbl = document.createElement("label");
+          lbl.style.cssText = "display:inline-flex; align-items:center; gap:0.35rem; background:#fff; padding:0.4rem 0.75rem; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:600;";
+          lbl.innerHTML = `<input type="checkbox" name="selected_rooms" value="${r.room_no}" checked> Room ${r.room_no} (${r.default_capacity} seats)`;
+          multiBox.appendChild(lbl);
+        });
+      })
+      .catch(err => {
+        console.error("Error loading rooms:", err);
+        selectRoom.innerHTML = '<option value="">Error loading rooms</option>';
+      });
+  }
+
+  function onRoomChange() {
+    const selectRoom = document.getElementById("select_room");
+    const roomInfoCard = document.getElementById("room_info_card");
+    if (!selectRoom || !roomInfoCard) return;
+
+    const opt = selectRoom.options[selectRoom.selectedIndex];
+    if (opt && opt.value && opt.dataset.capacity) {
+      document.getElementById("room_capacity").textContent = opt.dataset.capacity;
+      document.getElementById("room_rows").textContent = opt.dataset.rows;
+      document.getElementById("room_layout_disp").textContent = opt.dataset.layout;
+      roomInfoCard.style.display = 'block';
+    } else {
+      roomInfoCard.style.display = 'none';
+    }
+  }
+
+  function toggleAllocationScopeUI() {
+    const scopeSingle = document.getElementById("scope_single").checked;
+    const singleGroup = document.getElementById("single_room_group");
+    const multiGroup = document.getElementById("multi_room_group");
+    const roomInfoCard = document.getElementById("room_info_card");
+    const selectRoom = document.getElementById("select_room");
+    const seatingForm = document.getElementById("seatingForm");
+
+    if (scopeSingle) {
+      singleGroup.style.display = 'block';
+      multiGroup.style.display = 'none';
+      if (selectRoom.value) roomInfoCard.style.display = 'block';
+      selectRoom.setAttribute("required", "required");
+      seatingForm.action = "{{ url_for('create_seating') }}";
+    } else {
+      singleGroup.style.display = 'none';
+      multiGroup.style.display = 'block';
+      roomInfoCard.style.display = 'none';
+      selectRoom.removeAttribute("required");
+      seatingForm.action = "{{ url_for('auto_create_seating') }}";
+    }
+  }
+
+  function toggleLeftModeUI(mode) {
+    document.getElementById("left_dataset_inputs").style.display = mode === 'dataset' ? 'block' : 'none';
+    document.getElementById("left_manual_inputs").style.display = mode === 'manual' ? 'block' : 'none';
+  }
+
+  function toggleRightModeUI(mode) {
+    document.getElementById("right_dataset_inputs").style.display = mode === 'dataset' ? 'block' : 'none';
+    document.getElementById("right_manual_inputs").style.display = mode === 'manual' ? 'block' : 'none';
+  }
+
+  function setLeftDatasetCount(val) {
+    document.getElementById("left_dataset_count").value = val;
+    loadLeftDatasetPreview();
+  }
+
+  function setRightDatasetCount(val) {
+    document.getElementById("right_dataset_count").value = val;
+    loadRightDatasetPreview();
+  }
+
+  function loadLeftDatasetPreview() {
+    const branch = document.getElementById("left_branch")?.value || "";
+    const sem = document.getElementById("left_semester")?.value || "";
+    const sec = document.getElementById("left_section")?.value || "";
+    const college = document.getElementById("left_college")?.value || "GHRCE";
+    const limit = document.getElementById("left_dataset_count")?.value || 15;
+    const previewEl = document.getElementById("left_dataset_preview_text");
+
+    if (!previewEl) return;
+    if (!branch || !sem || !sec) {
+      previewEl.textContent = "Fill Branch, Sem & Sec to preview active roll numbers.";
+      return;
+    }
+
+    fetch(`/api/get_section_students?college=${encodeURIComponent(college)}&branch=${encodeURIComponent(branch)}&semester=${encodeURIComponent(sem)}&section=${encodeURIComponent(sec)}&limit=${limit}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.students && data.students.length > 0) {
+          const rolls = data.students.map(s => s.roll_no).join(", ");
+          previewEl.textContent = `Found ${data.total_active} active students. Selected first ${data.students.length}: [ ${rolls} ]`;
+        } else {
+          previewEl.textContent = `No active student records found for ${branch} Sem ${sem} Sec ${sec} in database.`;
+        }
+      })
+      .catch(() => {
+        previewEl.textContent = "Failed to load student preview.";
+      });
+  }
+
+  function loadRightDatasetPreview() {
+    const branch = document.getElementById("right_branch")?.value || "";
+    const sem = document.getElementById("right_semester")?.value || "";
+    const sec = document.getElementById("right_section")?.value || "";
+    const college = document.getElementById("right_college")?.value || "GHRCE";
+    const limit = document.getElementById("right_dataset_count")?.value || 15;
+    const previewEl = document.getElementById("right_dataset_preview_text");
+
+    if (!previewEl) return;
+    if (!branch || !sem || !sec) {
+      previewEl.textContent = "Fill Branch, Sem & Sec to preview active roll numbers.";
+      return;
+    }
+
+    fetch(`/api/get_section_students?college=${encodeURIComponent(college)}&branch=${encodeURIComponent(branch)}&semester=${encodeURIComponent(sem)}&section=${encodeURIComponent(sec)}&limit=${limit}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.students && data.students.length > 0) {
+          const rolls = data.students.map(s => s.roll_no).join(", ");
+          previewEl.textContent = `Found ${data.total_active} active students. Selected first ${data.students.length}: [ ${rolls} ]`;
+        } else {
+          previewEl.textContent = `No active student records found for ${branch} Sem ${sem} Sec ${sec} in database.`;
+        }
+      })
+      .catch(() => {
+        previewEl.textContent = "Failed to load student preview.";
+      });
+  }
+
+  document.getElementById("bench_mode_single")?.addEventListener("change", function() {
+    if (this.checked) {
+      document.getElementById("right_group_container").style.display = "none";
+    }
+  });
+  document.getElementById("bench_mode_double")?.addEventListener("change", function() {
+    if (this.checked) {
+      document.getElementById("right_group_container").style.display = "block";
+    }
+  });
+
+  // Initialize previews on load
+  document.addEventListener("DOMContentLoaded", function() {
+    loadLeftDatasetPreview();
+    loadRightDatasetPreview();
+  });
+</script>
 {% endblock %}

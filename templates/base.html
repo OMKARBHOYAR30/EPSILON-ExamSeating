@@ -52,12 +52,7 @@
           
           <a href="{{ url_for('new_seating') }}" class="nav-item {% if active_page == 'new_seating' %}active{% endif %}">
             <i class="fa-solid fa-users-rectangle"></i>
-            <span>Regular Seating Arrangement</span>
-          </a>
-
-          <a href="{{ url_for('oe_seating') }}" class="nav-item {% if active_page == 'oe_seating' %}active{% endif %}">
-            <i class="fa-solid fa-book-open" style="color: #38bdf8;"></i>
-            <span>Open Elective (OE) Seating</span>
+            <span>Seating Arrangement Generator</span>
           </a>
           
           <a href="{{ url_for('view_allocations') }}" class="nav-item {% if active_page == 'view_allocations' %}active{% endif %}">
