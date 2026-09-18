@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}OE Paper Allocation - EPSILON{% endblock %}
+{% block page_heading %}Open Elective (OE) Class-Wise Paper Allocation{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-heading); margin-bottom: 0.25rem;">
+        <i class="fa-solid fa-book-open" style="color: var(--primary); margin-right: 0.5rem;"></i>
+        Class-Wise OE Paper Requirement Breakdown
+      </h2>
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0;">
+        Calculates exact Open Elective question paper requirements independently for every class/section from the student dataset.
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+      <a href="{{ url_for('student_management') }}" class="btn btn-secondary">
+        <i class="fa-solid fa-graduation-cap"></i> Manage OE Student Dataset
+      </a>
+      <a href="{{ url_for('new_seating') }}" class="btn btn-primary">
+        <i class="fa-solid fa-users-rectangle"></i> Generate Seating Arrangement
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Badges -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--primary);">
+    <div style="font-size: 0.8rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">Total Classes / Sections</div>
+    <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-heading); margin-top: 0.25rem;">{{ total_classes }}</div>
+  </div>
+  
+  <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid #0284c7;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">Total OE Students Enrolled</div>
+    <div style="font-size: 1.8rem; font-weight: 800; color: #0284c7; margin-top: 0.25rem;">{{ total_students }}</div>
+  </div>
+
+  <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid #059669;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">Distinct OE Subjects</div>
+    <div style="font-size: 1.8rem; font-weight: 800; color: #059669; margin-top: 0.25rem;">{{ total_subjects }}</div>
+  </div>
+</div>
+
+{% if class_data %}
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.25rem;">
+    {% for c in class_data %}
+      <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary-light);">
+            <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary); margin: 0;">
+              <i class="fa-solid fa-users" style="margin-right: 0.4rem;"></i>
+              {{ c.class_label }}
+            </h3>
+            <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.78rem;">
+              Sec {{ c.section }}
+            </span>
+          </div>
+
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            <strong>College:</strong> {{ c.college }} | <strong>Program:</strong> {{ c.program }} | <strong>Sem:</strong> {{ c.semester }}
+          </p>
+
+          <table class="table" style="font-size: 0.85rem; margin-bottom: 0;">
+            <thead>
+              <tr style="background: #f8fafc;">
+                <th>Open Elective Subject</th>
+                <th style="text-align: right;">Papers Required</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in c.subjects %}
+                <tr>
+                  <td style="font-weight: 600; color: #1e293b;">
+                    <i class="fa-solid fa-book-journal-whills" style="color: #64748b; margin-right: 0.3rem;"></i>
+                    {{ s.subject }}
+                  </td>
+                  <td style="text-align: right; font-weight: 700; color: #0284c7;">
+                    {{ s.count }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr style="background: #f1f5f9; font-weight: 800;">
+                <td style="color: var(--text-heading);">Total Papers for Class</td>
+                <td style="text-align: right; color: var(--primary); font-size: 0.95rem;">
+                  {{ c.total_papers }} Papers
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+    <i class="fa-solid fa-folder-open fa-3x" style="color: #cbd5e1; margin-bottom: 1rem;"></i>
+    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">No OE Student Data Found</h3>
+    <p style="font-size: 0.88rem; color: var(--text-muted); max-width: 500px; margin: 0 auto 1.25rem;">
+      No student records with assigned Open Elective subjects were found in the database. Please import student dataset with OE subject column.
+    </p>
+    <a href="{{ url_for('student_management') }}" class="btn btn-primary">
+      <i class="fa-solid fa-upload"></i> Go to Student Management & Import Dataset
+    </a>
+  </div>
+{% endif %}
+{% endblock %}

@@ -54,6 +54,11 @@
             <i class="fa-solid fa-users-rectangle"></i>
             <span>Seating Arrangement Generator</span>
           </a>
+
+          <a href="{{ url_for('oe_paper_allocation') }}" class="nav-item {% if active_page == 'oe_paper_allocation' %}active{% endif %}">
+            <i class="fa-solid fa-book-open"></i>
+            <span>OE Paper Allocation</span>
+          </a>
           
           <a href="{{ url_for('view_allocations') }}" class="nav-item {% if active_page == 'view_allocations' %}active{% endif %}">
             <i class="fa-solid fa-table-list"></i>

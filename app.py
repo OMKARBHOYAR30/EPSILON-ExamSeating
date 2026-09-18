@@ -575,6 +575,87 @@ def block_report():
     return render_template("block_report.html", active_page="block_report", allocations=allocations)
 
 
+@app.route("/api/get_oe_subjects")
+@login_required
+def api_get_oe_subjects():
+    semester = request.args.get("semester", "").strip()
+    subjects = get_available_oe_subjects(semester=semester if semester else None)
+    return jsonify({"subjects": subjects})
+
+
+@app.route("/oe_paper_allocation")
+@login_required
+def oe_paper_allocation():
+    """
+    Independent Class-Wise OE Paper Allocation Page.
+    Groups students by class/section (college, program, branch, semester, section),
+    and counts students enrolled in each Open Elective subject independently.
+    """
+    db = get_db()
+    sections = db.execute(
+        """SELECT college, program, branch, semester, section 
+           FROM section_students 
+           WHERE is_active = 1 
+           GROUP BY college, program, branch, semester, section 
+           ORDER BY college, branch, semester, section"""
+    ).fetchall()
+
+    class_data = []
+    total_students_enrolled = 0
+    distinct_subjects = set()
+
+    for sec in sections:
+        c_name = sec["college"] or "GHRCE"
+        p_name = sec["program"] or "B.Tech"
+        b_name = sec["branch"]
+        sem = sec["semester"]
+        section_code = sec["section"]
+
+        sub_rows = db.execute(
+            """SELECT open_elective, COUNT(*) as count 
+               FROM section_students 
+               WHERE branch = ? AND semester = ? AND section = ? AND is_active = 1 
+                 AND open_elective IS NOT NULL AND open_elective != ''
+               GROUP BY open_elective 
+               ORDER BY open_elective""",
+            (b_name, sem, section_code)
+        ).fetchall()
+
+        if sub_rows:
+            subjects_list = []
+            class_total = 0
+            for r in sub_rows:
+                sub_name = r["open_elective"].strip()
+                cnt = r["count"]
+                subjects_list.append({"subject": sub_name, "count": cnt})
+                class_total += cnt
+                distinct_subjects.add(sub_name)
+
+            total_students_enrolled += class_total
+            class_label = f"{b_name} Sem {sem} (Sec {section_code})"
+            class_data.append({
+                "college": c_name,
+                "program": p_name,
+                "branch": b_name,
+                "semester": sem,
+                "section": section_code,
+                "class_label": class_label,
+                "subjects": subjects_list,
+                "total_papers": class_total
+            })
+
+    db.close()
+
+    return render_template(
+        "oe_paper_allocation.html",
+        active_page="oe_paper_allocation",
+        class_data=class_data,
+        total_classes=len(class_data),
+        total_students=total_students_enrolled,
+        total_subjects=len(distinct_subjects)
+    )
+
+
 @app.route("/allocation_summary")
 @login_required
 def allocation_summary():

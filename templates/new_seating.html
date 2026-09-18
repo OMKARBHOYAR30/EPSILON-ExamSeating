@@ -13,27 +13,44 @@
       Exam Details & Scope Selection
     </h3>
 
-    <!-- Allocation Category (Regular Section vs OE Paper Exam) -->
-    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
-      <label style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; display: block; color: var(--text-heading);">
-        Choose Seating Allocation Category:
+    <!-- Allocation Category (Regular Sitting Arrangement vs Particular OE Subject Arrangement) -->
+    <div style="background: #f8fafc; padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+      <label style="font-size: 0.95rem; font-weight: 800; margin-bottom: 0.75rem; display: block; color: var(--text-heading);">
+        <i class="fa-solid fa-sliders" style="color:var(--primary); margin-right: 0.4rem;"></i>
+        Choose Exam Sitting Arrangement Type:
       </label>
-      <div class="radio-group" style="grid-template-columns: 1fr 1fr;">
-        <label class="radio-card active">
-          <input type="radio" name="allocation_type" id="alloc_type_section" value="SECTION" checked>
+      <div class="radio-group" style="grid-template-columns: 1fr 1fr; margin-bottom: 1rem;">
+        <label class="radio-card active" id="card_alloc_section">
+          <input type="radio" name="allocation_type" id="alloc_type_section" value="SECTION" checked onchange="toggleOeSubjectSelectUI()">
           <div>
-            <strong>🏢 Regular Section Exam Allocation</strong>
-            <div style="font-size: 0.78rem; color: var(--text-muted);">Allocate by Branch, Semester & Section (e.g. CE Sem 5 Sec A)</div>
+            <strong>🏢 Regular Sitting Arrangement</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">Arranges students automatically by Class Section & Roll Numbers</div>
           </div>
         </label>
 
-        <label class="radio-card">
-          <input type="radio" name="allocation_type" id="alloc_type_oe" value="OE">
+        <label class="radio-card" id="card_alloc_oe">
+          <input type="radio" name="allocation_type" id="alloc_type_oe" value="OE" onchange="toggleOeSubjectSelectUI()">
           <div>
-            <strong>📖 OE Paper / Open Elective Exam Allocation</strong>
-            <div style="font-size: 0.78rem; color: var(--text-muted);">Tracks individual OE subjects & generates Room Paper Dispatch breakdown</div>
+            <strong>📖 Particular OE Subject Arrangement</strong>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">Arranges students enrolled in a specific Open Elective subject</div>
           </div>
         </label>
+      </div>
+
+      <!-- Particular OE Subject Selection (Visible when Particular OE Subject Arrangement is selected) -->
+      <div id="oe_subject_container" style="display: none; background: #ffffff; padding: 1rem; border-radius: 6px; border: 1px solid #bae6fd;">
+        <label for="left_oe_subject" style="font-size: 0.88rem; font-weight: 700; color: #0369a1; display: block; margin-bottom: 0.4rem;">
+          Select Particular Open Elective (OE) Subject:
+        </label>
+        <select id="left_oe_subject" name="left_oe_subject" class="form-select" style="max-width: 500px;" onchange="loadLeftDatasetPreview()">
+          <option value="">-- Select OE Subject --</option>
+          {% for sub in oe_subjects %}
+            <option value="{{ sub.open_elective }}">{{ sub.open_elective }} ({{ sub.count }} Enrolled Students)</option>
+          {% endfor %}
+        </select>
+        <div style="font-size: 0.78rem; color: #0284c7; margin-top: 0.35rem;">
+          <i class="fa-solid fa-circle-info"></i> All OE subjects are dynamically detected from the uploaded student dataset.
+        </div>
       </div>
     </div>
 
@@ -201,25 +218,7 @@
       </div>
     </div>
 
-    <!-- Paper Distribution Assignment Mode -->
-    <div style="background: #f8fafc; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-top: 0.75rem;">
-      <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.4rem;">
-        Paper Distribution Assignment Mode:
-      </label>
-      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #1e293b;">
-          <input type="radio" name="left_paper_dist_mode" id="left_dist_section" value="section" checked onchange="updateLeftPaperDistSummary()"> 
-          📋 <strong>Section-wise</strong> (Class & Roll No Range)
-        </label>
-        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #0284c7;">
-          <input type="radio" name="left_paper_dist_mode" id="left_dist_oe" value="oe" onchange="updateLeftPaperDistSummary()"> 
-          📖 <strong>Open Elective-wise</strong> (By Enrolled OE Subject)
-        </label>
-      </div>
-      <div id="left_paper_dist_summary_box" style="margin-top: 0.4rem; font-size: 0.82rem; padding: 0.4rem 0.65rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #334155;">
-        <!-- Live summary preview -->
-      </div>
-    </div>
+
 
     <!-- Roll Entry Selection Method -->
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
@@ -299,25 +298,7 @@
       </div>
     </div>
 
-    <!-- Paper Distribution Assignment Mode -->
-    <div style="background: #f8fafc; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-top: 0.75rem;">
-      <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.4rem;">
-        Paper Distribution Assignment Mode:
-      </label>
-      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #1e293b;">
-          <input type="radio" name="right_paper_dist_mode" id="right_dist_section" value="section" checked onchange="updateRightPaperDistSummary()"> 
-          📋 <strong>Section-wise</strong> (Class & Roll No Range)
-        </label>
-        <label style="cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem; color: #059669;">
-          <input type="radio" name="right_paper_dist_mode" id="right_dist_oe" value="oe" onchange="updateRightPaperDistSummary()"> 
-          📖 <strong>Open Elective-wise</strong> (By Enrolled OE Subject)
-        </label>
-      </div>
-      <div id="right_paper_dist_summary_box" style="margin-top: 0.4rem; font-size: 0.82rem; padding: 0.4rem 0.65rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #334155;">
-        <!-- Live summary preview -->
-      </div>
-    </div>
+
 
     <!-- Roll Entry Selection Method -->
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
@@ -484,7 +465,32 @@
     loadRightDatasetPreview();
   }
 
+  function toggleOeSubjectSelectUI() {
+    const isOe = document.getElementById("alloc_type_oe")?.checked;
+    const container = document.getElementById("oe_subject_container");
+    const cardSection = document.getElementById("card_alloc_section");
+    const cardOe = document.getElementById("card_alloc_oe");
+
+    if (container) {
+      container.style.display = isOe ? "block" : "none";
+    }
+
+    if (cardSection && cardOe) {
+      if (isOe) {
+        cardOe.classList.add("active");
+        cardSection.classList.remove("active");
+      } else {
+        cardSection.classList.add("active");
+        cardOe.classList.remove("active");
+      }
+    }
+
+    loadLeftDatasetPreview();
+  }
+
   function loadLeftDatasetPreview() {
+    const isOeMode = document.getElementById("alloc_type_oe")?.checked;
+    const oeSub = document.getElementById("left_oe_subject")?.value || "";
     const branch = document.getElementById("left_branch")?.value || "";
     const sem = document.getElementById("left_semester")?.value || "";
     const sec = document.getElementById("left_section")?.value || "";
@@ -493,24 +499,45 @@
     const previewEl = document.getElementById("left_dataset_preview_text");
 
     if (!previewEl) return;
-    if (!branch || !sem || !sec) {
-      previewEl.textContent = "Fill Branch, Sem & Sec to preview active roll numbers.";
-      return;
-    }
 
-    fetch(`/api/get_section_students?college=${encodeURIComponent(college)}&branch=${encodeURIComponent(branch)}&semester=${encodeURIComponent(sem)}&section=${encodeURIComponent(sec)}&limit=${limit}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.students && data.students.length > 0) {
-          const rolls = data.students.map(s => s.roll_no).join(", ");
-          previewEl.textContent = `Found ${data.total_active} active students. Selected first ${data.students.length}: [ ${rolls} ]`;
-        } else {
-          previewEl.textContent = `No active student records found for ${branch} Sem ${sem} Sec ${sec} in database.`;
-        }
-      })
-      .catch(() => {
-        previewEl.textContent = "Failed to load student preview.";
-      });
+    if (isOeMode) {
+      if (!oeSub) {
+        previewEl.textContent = "Please select a Particular OE Subject above to preview enrolled students.";
+        return;
+      }
+      fetch(`/api/get_oe_students?open_elective=${encodeURIComponent(oeSub)}&semester=${encodeURIComponent(sem)}&limit=${limit}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.students && data.students.length > 0) {
+            const rolls = data.students.map(s => s.roll_no).join(", ");
+            previewEl.textContent = `Found ${data.total_active} students enrolled in [ ${oeSub} ]. Selected first ${data.students.length}: [ ${rolls} ]`;
+          } else {
+            previewEl.textContent = `No active student records found enrolled in ${oeSub} in database.`;
+          }
+        })
+        .catch(() => {
+          previewEl.textContent = "Failed to load OE student preview.";
+        });
+    } else {
+      if (!branch || !sem || !sec) {
+        previewEl.textContent = "Fill Branch, Sem & Sec to preview active roll numbers.";
+        return;
+      }
+
+      fetch(`/api/get_section_students?college=${encodeURIComponent(college)}&branch=${encodeURIComponent(branch)}&semester=${encodeURIComponent(sem)}&section=${encodeURIComponent(sec)}&limit=${limit}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.students && data.students.length > 0) {
+            const rolls = data.students.map(s => s.roll_no).join(", ");
+            previewEl.textContent = `Found ${data.total_active} active students. Selected first ${data.students.length}: [ ${rolls} ]`;
+          } else {
+            previewEl.textContent = `No active student records found for ${branch} Sem ${sem} Sec ${sec} in database.`;
+          }
+        })
+        .catch(() => {
+          previewEl.textContent = "Failed to load student preview.";
+        });
+    }
   }
 
   function loadRightDatasetPreview() {
@@ -542,56 +569,6 @@
       });
   }
 
-  function updateLeftPaperDistSummary() {
-    const isSectionMode = document.getElementById("left_dist_section")?.checked;
-    const sec = document.getElementById("left_section")?.value || "A";
-    const branch = document.getElementById("left_branch")?.value || "CE";
-    const sem = document.getElementById("left_semester")?.value || "5";
-    const count = document.getElementById("left_dataset_count")?.value || 15;
-    const box = document.getElementById("left_paper_dist_summary_box");
-
-    if (!box) return;
-
-    if (isSectionMode) {
-      box.innerHTML = `
-        <div style="color: #1e293b; font-weight:700;">Section-wise Distribution:</div>
-        <div>Section: <strong>${sec}</strong> (${branch} Sem ${sem}) | Students/Papers: <strong>${count}</strong></div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Calculates total papers required for this section's roll-number range.</div>
-      `;
-    } else {
-      box.innerHTML = `
-        <div style="color: #0284c7; font-weight:700;">Open Elective-wise Distribution:</div>
-        <div>Identifies enrolled OE subjects for ${branch} Sem ${sem} Sec ${sec} students (Total: <strong>${count} Papers</strong>)</div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Assigns papers according to each student's allocated Open Elective subject.</div>
-      `;
-    }
-  }
-
-  function updateRightPaperDistSummary() {
-    const isSectionMode = document.getElementById("right_dist_section")?.checked;
-    const sec = document.getElementById("right_section")?.value || "B";
-    const branch = document.getElementById("right_branch")?.value || "IT";
-    const sem = document.getElementById("right_semester")?.value || "5";
-    const count = document.getElementById("right_dataset_count")?.value || 15;
-    const box = document.getElementById("right_paper_dist_summary_box");
-
-    if (!box) return;
-
-    if (isSectionMode) {
-      box.innerHTML = `
-        <div style="color: #1e293b; font-weight:700;">Section-wise Distribution:</div>
-        <div>Section: <strong>${sec}</strong> (${branch} Sem ${sem}) | Students/Papers: <strong>${count}</strong></div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Calculates total papers required for this section's roll-number range.</div>
-      `;
-    } else {
-      box.innerHTML = `
-        <div style="color: #059669; font-weight:700;">Open Elective-wise Distribution:</div>
-        <div>Identifies enrolled OE subjects for ${branch} Sem ${sem} Sec ${sec} students (Total: <strong>${count} Papers</strong>)</div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">Assigns papers according to each student's allocated Open Elective subject.</div>
-      `;
-    }
-  }
-
   document.getElementById("bench_mode_single")?.addEventListener("change", function() {
     if (this.checked) {
       document.getElementById("right_group_container").style.display = "none";
@@ -605,10 +582,8 @@
 
   // Initialize previews on load
   document.addEventListener("DOMContentLoaded", function() {
-    loadLeftDatasetPreview();
+    toggleOeSubjectSelectUI();
     loadRightDatasetPreview();
-    updateLeftPaperDistSummary();
-    updateRightPaperDistSummary();
   });
 </script>
 {% endblock %}
