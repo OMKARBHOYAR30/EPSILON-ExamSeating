@@ -119,7 +119,13 @@ def generate_block_report(allocation_id=None):
         from modules.allocation_manager import get_allocation_paper_count_breakdown
         paper_counts = get_allocation_paper_count_breakdown(allocation["id"])
         if paper_counts:
-            paper_str = "   |   ".join([f"{p['subject']}: {p['count']} Papers" for p in paper_counts])
+            paper_parts = []
+            for p in paper_counts:
+                if p["subject"] == "Total Papers":
+                    paper_parts.append(f"Total: {p['count']} Papers")
+                else:
+                    paper_parts.append(f"{p['subject']}: {p['count']} Papers")
+            paper_str = "   |   ".join(paper_parts)
             pdf.setFont("Helvetica-Bold", 10)
             pdf.setFillColor(colors.HexColor("#0369a1"))
             pdf.drawRightString(width - 40, y, f"DISPATCH: {paper_str}")

@@ -159,6 +159,7 @@ def get_recent_allocations(limit=5):
 def get_allocation_paper_count_breakdown(allocation_id):
     """
     Calculates exact paper distribution count according to Section-wise or Open Elective-wise options.
+    Dynamically groups by Open Elective subjects present in the room data and calculates Total Papers.
     """
     db = get_db()
     allocation = db.execute("SELECT * FROM allocations WHERE id = ?", (allocation_id,)).fetchone()
@@ -173,20 +174,19 @@ def get_allocation_paper_count_breakdown(allocation_id):
 
     left_rolls = [r["left_student"].strip() for r in chart_rows if r["left_student"] and r["left_student"].strip()]
     right_rolls = [r["right_student"].strip() for r in chart_rows if r["right_student"] and r["right_student"].strip()]
-    all_rolls = left_rolls + right_rolls
+    all_rolls = list(set(left_rolls + right_rolls))
 
-    if not all_rolls:
-        db.close()
-        return []
+    student_map = {}
+    if all_rolls:
+        placeholders = ",".join(["?"] * len(all_rolls))
+        students = db.execute(
+            f"SELECT roll_no, branch, section, semester, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
+            all_rolls
+        ).fetchall()
+        for s in students:
+            student_map[str(s["roll_no"]).strip()] = dict(s)
 
-    placeholders = ",".join(["?"] * len(all_rolls))
-    students = db.execute(
-        f"SELECT roll_no, branch, section, semester, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
-        all_rolls
-    ).fetchall()
     db.close()
-
-    student_map = {s["roll_no"]: s for s in students}
 
     left_dist_mode = allocation.get("left_paper_dist_mode") or "section"
     right_dist_mode = allocation.get("right_paper_dist_mode") or "section"
@@ -203,7 +203,8 @@ def get_allocation_paper_count_breakdown(allocation_id):
             for r_no in left_rolls:
                 stud = student_map.get(r_no)
                 oe_sub = (stud.get("open_elective") if stud else "") or allocation.get("left_oe_subject") or "Open Elective"
-                key = f"OE: {oe_sub.strip()}"
+                oe_sub = (oe_sub or "Open Elective").strip()
+                key = f"OE: {oe_sub}" if not oe_sub.lower().startswith("oe:") else oe_sub
                 paper_counts[key] = paper_counts.get(key, 0) + 1
         else:
             sec_name = f"Section {allocation['left_section']} ({allocation['left_branch']} Sem {allocation['left_semester']})" if allocation.get("left_section") else f"{allocation['left_branch']} Paper"
@@ -217,7 +218,8 @@ def get_allocation_paper_count_breakdown(allocation_id):
             for r_no in right_rolls:
                 stud = student_map.get(r_no)
                 oe_sub = (stud.get("open_elective") if stud else "") or allocation.get("right_oe_subject") or "Open Elective"
-                key = f"OE: {oe_sub.strip()}"
+                oe_sub = (oe_sub or "Open Elective").strip()
+                key = f"OE: {oe_sub}" if not oe_sub.lower().startswith("oe:") else oe_sub
                 paper_counts[key] = paper_counts.get(key, 0) + 1
         else:
             sec_name = f"Section {allocation['right_section']} ({allocation['right_branch']} Sem {allocation['right_semester']})" if allocation.get("right_section") else f"{allocation['right_branch']} Paper"
@@ -227,6 +229,11 @@ def get_allocation_paper_count_breakdown(allocation_id):
 
     result = [{"subject": k, "count": v} for k, v in paper_counts.items()]
     result.sort(key=lambda x: x["count"], reverse=True)
+
+    total_papers = len(left_rolls) + len(right_rolls)
+    if total_papers > 0:
+        result.append({"subject": "Total Papers", "count": total_papers})
+
     return result
 
 
