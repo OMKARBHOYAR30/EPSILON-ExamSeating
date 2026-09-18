@@ -92,6 +92,31 @@
               </tr>
             </tfoot>
           </table>
+
+          {% if c.rooms_breakdown %}
+            <div style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed #cbd5e1;">
+              <strong style="font-size: 0.83rem; color: #166534; display: block; margin-bottom: 0.4rem;">
+                <i class="fa-solid fa-door-open"></i> ROOM WISE ALLOCATION FOR OE (Invigilator Dispatch):
+              </strong>
+              {% for rm in c.rooms_breakdown %}
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.4rem; font-size: 0.8rem;">
+                  <div style="font-weight: 800; color: #15803d; margin-bottom: 0.2rem;">
+                    {{ rm.room_label }}
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                    {% for sb in rm.subjects %}
+                      <span style="background: #ffffff; color: #166534; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; border: 1px solid #86efac;">
+                        {{ sb.subject }} → {{ sb.count }} Papers
+                      </span>
+                    {% endfor %}
+                    <span style="background: #166534; color: #ffffff; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 800;">
+                      Total → {{ rm.total_papers }} Papers
+                    </span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
       </div>
     {% endfor %}

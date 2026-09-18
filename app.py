@@ -23,7 +23,8 @@ from modules.student_manager import (
 from modules.allocation_manager import (
     create_seating_allocation, auto_generate_multi_room_seating, get_all_allocations, get_recent_allocations,
     get_allocation_by_id, delete_allocation, check_existing_allocation,
-    get_available_sections, get_section_students, get_oe_students, get_allocated_students_by_date
+    get_available_sections, get_section_students, get_oe_students, get_allocated_students_by_date,
+    get_section_room_wise_oe_breakdown
 )
 from modules.report_manager import generate_all_reports, get_report_filepath
 from modules.block_report import generate_block_report
@@ -583,13 +584,24 @@ def api_get_oe_subjects():
     return jsonify({"subjects": subjects})
 
 
+@app.route("/api/get_section_room_oe_breakdown")
+@login_required
+def api_get_section_room_oe_breakdown():
+    branch = request.args.get("branch", "").strip()
+    semester = request.args.get("semester", "").strip()
+    section = request.args.get("section", "").strip()
+
+    rooms_breakdown = get_section_room_wise_oe_breakdown(branch, semester, section)
+    return jsonify({"branch": branch, "semester": semester, "section": section, "rooms": rooms_breakdown})
+
+
 @app.route("/oe_paper_allocation")
 @login_required
 def oe_paper_allocation():
     """
     Independent Class-Wise OE Paper Allocation Page.
     Groups students by class/section (college, program, branch, semester, section),
-    and counts students enrolled in each Open Elective subject independently.
+    counts students enrolled in each Open Elective subject, and calculates room-wise distribution.
     """
     db = get_db()
     sections = db.execute(
@@ -633,6 +645,10 @@ def oe_paper_allocation():
 
             total_students_enrolled += class_total
             class_label = f"{b_name} Sem {sem} (Sec {section_code})"
+            
+            # Retrieve room-wise seating allocation breakdown for this section
+            rooms_breakdown = get_section_room_wise_oe_breakdown(b_name, sem, section_code)
+
             class_data.append({
                 "college": c_name,
                 "program": p_name,
@@ -641,7 +657,8 @@ def oe_paper_allocation():
                 "section": section_code,
                 "class_label": class_label,
                 "subjects": subjects_list,
-                "total_papers": class_total
+                "total_papers": class_total,
+                "rooms_breakdown": rooms_breakdown
             })
 
     db.close()

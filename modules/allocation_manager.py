@@ -237,6 +237,74 @@ def get_allocation_paper_count_breakdown(allocation_id):
     return result
 
 
+def get_section_room_wise_oe_breakdown(branch, semester, section):
+    """
+    Finds all rooms where students of a specific section (branch, semester, section)
+    are seated, and calculates room-wise OE subject paper breakdown for those students.
+    """
+    db = get_db()
+
+    students = db.execute(
+        "SELECT roll_no, open_elective FROM section_students WHERE branch = ? AND semester = ? AND section = ? AND is_active = 1",
+        (branch, str(semester), section)
+    ).fetchall()
+
+    if not students:
+        db.close()
+        return []
+
+    stud_map = {s["roll_no"].strip(): (s["open_elective"] or "Open Elective").strip() for s in students}
+    section_rolls = list(stud_map.keys())
+
+    if not section_rolls:
+        db.close()
+        return []
+
+    placeholders = ",".join(["?"] * len(section_rolls))
+    chart_query = f"""
+        SELECT sc.allocation_id, sc.left_student, sc.right_student, a.room_no, a.block
+        FROM seating_chart sc
+        JOIN allocations a ON sc.allocation_id = a.id
+        WHERE sc.left_student IN ({placeholders}) OR sc.right_student IN ({placeholders})
+        ORDER BY a.room_no
+    """
+    chart_rows = db.execute(chart_query, section_rolls + section_rolls).fetchall()
+    db.close()
+
+    rooms_data = {}
+    for row in chart_rows:
+        room_key = f"Room {row['room_no']} (Block {row['block']})"
+        if room_key not in rooms_data:
+            rooms_data[room_key] = {"room_no": row["room_no"], "block": row["block"], "subjects": {}, "total": 0}
+
+        l_roll = (row["left_student"] or "").strip()
+        r_roll = (row["right_student"] or "").strip()
+
+        if l_roll in stud_map:
+            oe_sub = stud_map[l_roll]
+            rooms_data[room_key]["subjects"][oe_sub] = rooms_data[room_key]["subjects"].get(oe_sub, 0) + 1
+            rooms_data[room_key]["total"] += 1
+
+        if r_roll in stud_map:
+            oe_sub = stud_map[r_roll]
+            rooms_data[room_key]["subjects"][oe_sub] = rooms_data[room_key]["subjects"].get(oe_sub, 0) + 1
+            rooms_data[room_key]["total"] += 1
+
+    result = []
+    for r_key, r_info in rooms_data.items():
+        sub_list = [{"subject": k, "count": v} for k, v in r_info["subjects"].items()]
+        sub_list.sort(key=lambda x: x["count"], reverse=True)
+        result.append({
+            "room_label": r_key,
+            "room_no": r_info["room_no"],
+            "block": r_info["block"],
+            "subjects": sub_list,
+            "total_papers": r_info["total"]
+        })
+
+    return result
+
+
 def get_allocation_by_id(allocation_id):
     """Fetch allocation detail with its seating chart, student names, OE subjects, and paper count breakdown."""
     db = get_db()

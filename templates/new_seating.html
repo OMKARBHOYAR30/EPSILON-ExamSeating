@@ -37,19 +37,58 @@
         </label>
       </div>
 
-      <!-- Particular OE Subject Selection (Visible when Particular OE Subject Arrangement is selected) -->
-      <div id="oe_subject_container" style="display: none; background: #ffffff; padding: 1rem; border-radius: 6px; border: 1px solid #bae6fd;">
-        <label for="left_oe_subject" style="font-size: 0.88rem; font-weight: 700; color: #0369a1; display: block; margin-bottom: 0.4rem;">
-          Select Particular Open Elective (OE) Subject:
+      <!-- Particular OE Subject Sub-Options (Visible when Particular OE Subject Arrangement is selected) -->
+      <div id="oe_subject_container" style="display: none; background: #ffffff; padding: 1.15rem; border-radius: 8px; border: 1px solid #bae6fd; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <label style="font-size: 0.88rem; font-weight: 800; color: #0369a1; display: block; margin-bottom: 0.6rem;">
+          <i class="fa-solid fa-list-check" style="margin-right: 0.3rem;"></i> Choose Particular OE Action:
         </label>
-        <select id="left_oe_subject" name="left_oe_subject" class="form-select" style="max-width: 500px;" onchange="loadLeftDatasetPreview()">
-          <option value="">-- Select OE Subject --</option>
-          {% for sub in oe_subjects %}
-            <option value="{{ sub.open_elective }}">{{ sub.open_elective }} ({{ sub.count }} Enrolled Students)</option>
-          {% endfor %}
-        </select>
-        <div style="font-size: 0.78rem; color: #0284c7; margin-top: 0.35rem;">
-          <i class="fa-solid fa-circle-info"></i> All OE subjects are dynamically detected from the uploaded student dataset.
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+          <label style="cursor: pointer; font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; color: #0369a1;">
+            <input type="radio" name="oe_sub_mode" id="oe_mode_overall" value="overall" checked onchange="toggleOeSubModeUI()">
+            Option 1: Overall OE Subject Arrangement (Generate Seating)
+          </label>
+          <label style="cursor: pointer; font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; color: #059669;">
+            <input type="radio" name="oe_sub_mode" id="oe_mode_section_alloc" value="section_alloc" onchange="toggleOeSubModeUI()">
+            Option 2: Section Selection for OE Paper Allocation (Room-Wise View)
+          </label>
+        </div>
+
+        <!-- Option 1: Dropdown for Overall OE Subject Arrangement -->
+        <div id="oe_option_1_box">
+          <label for="left_oe_subject" style="font-size: 0.85rem; font-weight: 700; color: #0369a1; display: block; margin-bottom: 0.35rem;">
+            Select Particular Open Elective (OE) Subject:
+          </label>
+          <select id="left_oe_subject" name="left_oe_subject" class="form-select" style="max-width: 500px;" onchange="loadLeftDatasetPreview()">
+            <option value="">-- Select OE Subject --</option>
+            {% for sub in oe_subjects %}
+              <option value="{{ sub.open_elective }}">{{ sub.open_elective }} ({{ sub.count }} Enrolled Students)</option>
+            {% endfor %}
+          </select>
+          <div style="font-size: 0.78rem; color: #0284c7; margin-top: 0.35rem;">
+            <i class="fa-solid fa-circle-info"></i> Generates seating arrangement for students enrolled in this OE subject across sections.
+          </div>
+        </div>
+
+        <!-- Option 2: Section Selection for OE Paper Allocation Room-Wise Breakdown -->
+        <div id="oe_option_2_box" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 1rem; border-radius: 6px;">
+          <label style="font-size: 0.88rem; font-weight: 800; color: #166534; display: block; margin-bottom: 0.4rem;">
+            <i class="fa-solid fa-file-signature"></i> Room-Wise OE Question Paper Requirement Preview:
+          </label>
+          <p style="font-size: 0.8rem; color: #15803d; margin-bottom: 0.75rem;">
+            Select a Section to inspect exact room-wise OE paper dispatch counts (e.g. Room A-017, Room C-014).
+          </p>
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+            <button type="button" class="btn btn-sm btn-success" onclick="fetchSectionRoomOeBreakdown()">
+              <i class="fa-solid fa-magnifying-glass"></i> Load Section Room-Wise OE Breakdown
+            </button>
+            <a href="{{ url_for('oe_paper_allocation') }}" target="_blank" style="font-size: 0.82rem; font-weight: 700; color: #166534; text-decoration: underline;">
+              Open Full Class-Wise OE Paper Allocation Page <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+          </div>
+
+          <div id="section_room_oe_result" style="font-size: 0.85rem; background: #ffffff; padding: 0.75rem; border-radius: 6px; border: 1px solid #dcfce7; display: none;">
+            <!-- Rendered live via JS -->
+          </div>
         </div>
       </div>
     </div>
@@ -465,6 +504,75 @@
     loadRightDatasetPreview();
   }
 
+  function toggleOeSubModeUI() {
+    const isOverall = document.getElementById("oe_mode_overall")?.checked;
+    const box1 = document.getElementById("oe_option_1_box");
+    const box2 = document.getElementById("oe_option_2_box");
+
+    if (box1) box1.style.display = isOverall ? "block" : "none";
+    if (box2) box2.style.display = isOverall ? "none" : "block";
+
+    if (!isOverall) {
+      fetchSectionRoomOeBreakdown();
+    } else {
+      loadLeftDatasetPreview();
+    }
+  }
+
+  function fetchSectionRoomOeBreakdown() {
+    const branch = document.getElementById("left_branch")?.value || "";
+    const sem = document.getElementById("left_semester")?.value || "";
+    const sec = document.getElementById("left_section")?.value || "";
+    const resBox = document.getElementById("section_room_oe_result");
+
+    if (!resBox) return;
+
+    if (!branch || !sem || !sec) {
+      resBox.style.display = "block";
+      resBox.innerHTML = '<span style="color:#c2410c;">Please enter Branch, Semester and Section in Step 3 to view room breakdown.</span>';
+      return;
+    }
+
+    resBox.style.display = "block";
+    resBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading room-wise OE paper breakdown...';
+
+    fetch(`/api/get_section_room_oe_breakdown?branch=${encodeURIComponent(branch)}&semester=${encodeURIComponent(sem)}&section=${encodeURIComponent(sec)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.rooms && data.rooms.length > 0) {
+          let html = `<strong style="color:#15803d; display:block; margin-bottom:0.4rem;">ROOM WISE ALLOCATION FOR OE (${data.branch} Sem ${data.semester} Sec ${data.section}):</strong>`;
+          data.rooms.forEach(r => {
+            html += `
+              <div style="background:#f8fafc; border:1px solid #cbd5e1; padding:0.6rem 0.85rem; border-radius:6px; margin-bottom:0.5rem;">
+                <div style="font-weight:800; color:#0369a1; font-size:0.85rem; margin-bottom:0.25rem;">
+                  <i class="fa-solid fa-door-open"></i> ${r.room_label}
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:0.4rem; font-size:0.8rem;">
+            `;
+            r.subjects.forEach(s => {
+              html += `<span style="background:#e0f2fe; color:#0369a1; padding:0.15rem 0.5rem; border-radius:4px; font-weight:700;">${s.subject} → ${s.count} Papers</span>`;
+            });
+            html += `
+                  <span style="background:#15803d; color:#ffffff; padding:0.15rem 0.5rem; border-radius:4px; font-weight:800;">Total → ${r.total_papers} Papers</span>
+                </div>
+              </div>
+            `;
+          });
+          resBox.innerHTML = html;
+        } else {
+          resBox.innerHTML = `
+            <div style="color:#475569;">
+              <strong>No seating allocation has been created yet for ${data.branch} Sem ${data.semester} Sec ${data.section}.</strong>
+              <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">Generate seating arrangement first to view room-wise distribution, or open the <a href="/oe_paper_allocation" target="_blank" style="color:#0284c7; text-decoration:underline;">OE Paper Allocation</a> page for class totals.</div>
+            </div>
+          `;
+        }
+      })
+      .catch(() => {
+        resBox.innerHTML = '<span style="color:#b91c1c;">Failed to load section room breakdown.</span>';
+      });
+  }
+
   function toggleOeSubjectSelectUI() {
     const isOe = document.getElementById("alloc_type_oe")?.checked;
     const container = document.getElementById("oe_subject_container");
@@ -485,7 +593,7 @@
       }
     }
 
-    loadLeftDatasetPreview();
+    toggleOeSubModeUI();
   }
 
   function loadLeftDatasetPreview() {
