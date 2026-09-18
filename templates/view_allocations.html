@@ -123,12 +123,33 @@
       .then(res => res.json())
       .then(data => {
         title.textContent = `Allocation Details - Room ${data.room_no} (#${data.id})`;
+        
+        let paperHtml = '';
+        if (data.paper_counts && data.paper_counts.length > 0) {
+          paperHtml = `
+            <div style="background:#f0f9ff; border:1px solid #bae6fd; padding:0.85rem 1rem; border-radius:8px; margin-bottom:1rem; font-size:0.85rem;">
+              <strong style="color:#0369a1; display:block; margin-bottom:0.4rem;">
+                <i class="fa-solid fa-file-signature"></i> Room Question Paper Dispatch Breakdown (Invigilator Count):
+              </strong>
+              <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+          `;
+          data.paper_counts.forEach(p => {
+            paperHtml += `
+              <span style="background:#e0f2fe; color:#0369a1; padding:0.25rem 0.6rem; border-radius:6px; font-weight:700; border:1px solid #7dd3fc; font-size:0.82rem;">
+                ${p.subject}: ${p.count} Papers
+              </span>
+            `;
+          });
+          paperHtml += `</div></div>`;
+        }
+
         let html = `
           <div style="background:#f8fafc; padding:1rem; border-radius:8px; margin-bottom:1rem; font-size:0.88rem;">
             <div><strong>Block:</strong> ${data.block} | <strong>Mode:</strong> ${data.bench_mode}</div>
             <div><strong>Left Class:</strong> ${data.left_college} - ${data.left_branch} (Sem ${data.left_semester}, Sec ${data.left_section})</div>
             ${data.bench_mode === 'DOUBLE' ? `<div><strong>Right Class:</strong> ${data.right_college} - ${data.right_branch} (Sem ${data.right_semester}, Sec ${data.right_section})</div>` : ''}
           </div>
+          ${paperHtml}
           <h4 style="font-size:0.95rem; margin-bottom:0.5rem; font-weight:700;">Bench Seating Layout</h4>
           <table class="table" style="font-size:0.85rem;">
             <thead>
@@ -141,11 +162,25 @@
             <tbody>
         `;
         data.seating_chart.forEach(b => {
+          let leftDisp = '-';
+          if (b.left_student) {
+            leftDisp = `<strong style="color:var(--primary);">${b.left_student}</strong>`;
+            if (b.left_name) leftDisp += `<div style="font-size:0.78rem; color:#64748b;">${b.left_name}</div>`;
+            if (b.left_oe) leftDisp += `<span style="display:inline-block; font-size:0.75rem; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; margin-top:2px; font-weight:600;">OE: ${b.left_oe}</span>`;
+          }
+
+          let rightDisp = '-';
+          if (b.right_student) {
+            rightDisp = `<strong style="color:#059669;">${b.right_student}</strong>`;
+            if (b.right_name) rightDisp += `<div style="font-size:0.78rem; color:#64748b;">${b.right_name}</div>`;
+            if (b.right_oe) rightDisp += `<span style="display:inline-block; font-size:0.75rem; background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:4px; margin-top:2px; font-weight:600;">OE: ${b.right_oe}</span>`;
+          }
+
           html += `
             <tr>
-              <td>Bench #${b.bench_no}</td>
-              <td><strong style="color:var(--primary);">${b.left_student || '-'}</strong></td>
-              <td><strong style="color:#059669;">${b.right_student || '-'}</strong></td>
+              <td style="font-weight:700; color:#475569;">Bench #${b.bench_no}</td>
+              <td>${leftDisp}</td>
+              <td>${rightDisp}</td>
             </tr>
           `;
         });

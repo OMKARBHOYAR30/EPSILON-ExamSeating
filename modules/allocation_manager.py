@@ -188,35 +188,26 @@ def get_allocation_paper_count_breakdown(allocation_id):
         f"SELECT roll_no, branch, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
         rolls
     ).fetchall()
+    db.close()
 
     student_map = {s["roll_no"]: s for s in students}
     subject_counts = {}
 
-    is_oe_alloc = allocation["allocation_type"] == "OE"
-    left_oe_sub = allocation["left_oe_subject"]
-    right_oe_sub = allocation["right_oe_subject"]
+    left_default_branch = allocation["left_branch"] or "Regular Exam Paper"
 
     for r_no in rolls:
         stud = student_map.get(r_no)
         sub = ""
 
-        if stud:
-            if is_oe_alloc and stud["open_elective"]:
-                sub = stud["open_elective"].strip()
-            elif stud["open_elective"]:
-                sub = stud["open_elective"].strip()
-            else:
-                sub = f"{stud['branch']} Paper"
+        if stud and stud.get("open_elective") and stud["open_elective"].strip():
+            sub = stud["open_elective"].strip()
+        elif stud and stud.get("branch") and stud["branch"].strip():
+            sub = f"{stud['branch'].strip()} Paper"
 
         if not sub:
-            if is_oe_alloc:
-                sub = left_oe_sub or right_oe_sub or "OE Subject"
-            else:
-                sub = allocation["left_branch"] or "Regular Exam Paper"
+            sub = left_default_branch
 
         subject_counts[sub] = subject_counts.get(sub, 0) + 1
-
-    db.close()
 
     result = [{"subject": k, "count": v} for k, v in subject_counts.items()]
     result.sort(key=lambda x: x["count"], reverse=True)
@@ -224,7 +215,7 @@ def get_allocation_paper_count_breakdown(allocation_id):
 
 
 def get_allocation_by_id(allocation_id):
-    """Fetch allocation detail with its seating chart and paper count breakdown."""
+    """Fetch allocation detail with its seating chart, student names, OE subjects, and paper count breakdown."""
     db = get_db()
     allocation = db.execute("SELECT * FROM allocations WHERE id = ?", (allocation_id,)).fetchone()
     if not allocation:
@@ -236,9 +227,46 @@ def get_allocation_by_id(allocation_id):
         "SELECT bench_no, left_student, right_student FROM seating_chart WHERE allocation_id = ? ORDER BY bench_no",
         (allocation_id,)
     ).fetchall()
+
+    rolls = set()
+    for c in chart_rows:
+        if c["left_student"] and c["left_student"].strip():
+            rolls.add(c["left_student"].strip())
+        if c["right_student"] and c["right_student"].strip():
+            rolls.add(c["right_student"].strip())
+
+    student_map = {}
+    if rolls:
+        placeholders = ",".join(["?"] * len(rolls))
+        st_rows = db.execute(
+            f"SELECT roll_no, student_name, branch, section, open_elective FROM section_students WHERE roll_no IN ({placeholders})",
+            list(rolls)
+        ).fetchall()
+        for s in st_rows:
+            student_map[s["roll_no"]] = dict(s)
+
     db.close()
 
-    alloc_dict["seating_chart"] = [dict(c) for c in chart_rows]
+    chart_with_details = []
+    for c in chart_rows:
+        l_roll = (c["left_student"] or "").strip()
+        r_roll = (c["right_student"] or "").strip()
+        l_info = student_map.get(l_roll, {})
+        r_info = student_map.get(r_roll, {})
+
+        chart_with_details.append({
+            "bench_no": c["bench_no"],
+            "left_student": l_roll,
+            "left_name": l_info.get("student_name", ""),
+            "left_oe": l_info.get("open_elective", ""),
+            "left_branch": l_info.get("branch", ""),
+            "right_student": r_roll,
+            "right_name": r_info.get("student_name", ""),
+            "right_oe": r_info.get("open_elective", ""),
+            "right_branch": r_info.get("branch", "")
+        })
+
+    alloc_dict["seating_chart"] = chart_with_details
     alloc_dict["paper_counts"] = get_allocation_paper_count_breakdown(allocation_id)
     return alloc_dict
 
