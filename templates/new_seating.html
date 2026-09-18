@@ -78,8 +78,16 @@
             Select a Section to inspect exact room-wise OE paper dispatch counts (e.g. Room A-017, Room C-014).
           </p>
           <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+            <select id="oe_section_room_select" class="form-select" style="max-width: 420px; font-weight: 700;" onchange="fetchSectionRoomOeBreakdownFromSelect(this.value)">
+              <option value="">-- Choose Registered Class/Section --</option>
+              {% for sec in sections %}
+                <option value="{{ sec.branch }}|{{ sec.semester }}|{{ sec.section }}">
+                  {{ sec.college }} - {{ sec.branch }} Sem {{ sec.semester }} (Sec {{ sec.section }})
+                </option>
+              {% endfor %}
+            </select>
             <button type="button" class="btn btn-sm btn-success" onclick="fetchSectionRoomOeBreakdown()">
-              <i class="fa-solid fa-magnifying-glass"></i> Load Section Room-Wise OE Breakdown
+              <i class="fa-solid fa-magnifying-glass"></i> Load Breakdown
             </button>
             <a href="{{ url_for('oe_paper_allocation') }}" target="_blank" style="font-size: 0.82rem; font-weight: 700; color: #166534; text-decoration: underline;">
               Open Full Class-Wise OE Paper Allocation Page <i class="fa-solid fa-arrow-up-right-from-square"></i>
@@ -228,6 +236,24 @@
       Left Group Details
     </h3>
 
+    <!-- Quick Manual Section Select Dropdown -->
+    <div style="background: #f8fafc; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+      <label for="left_quick_section_select" style="font-size: 0.85rem; font-weight: 800; color: var(--primary); display: block; margin-bottom: 0.35rem;">
+        <i class="fa-solid fa-hand-pointer"></i> Manual Section Selection Dropdown (Left Student):
+      </label>
+      <select id="left_quick_section_select" class="form-select" style="font-weight: 600;" onchange="applyLeftSectionSelect(this.value)">
+        <option value="">-- Or Select Existing Registered Section --</option>
+        {% for sec in sections %}
+          <option value="{{ sec.college }}|{{ sec.program }}|{{ sec.branch }}|{{ sec.semester }}|{{ sec.section }}">
+            {{ sec.college }} - {{ sec.branch }} Sem {{ sec.semester }} (Sec {{ sec.section }}) — {{ sec.active_count }} Active Students
+          </option>
+        {% endfor %}
+      </select>
+      <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">
+        Selecting a section automatically populates the fields below and previews active students.
+      </div>
+    </div>
+
     <div class="form-row" id="left_section_row" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem;">
       <div class="form-group">
         <label for="left_college">College</label>
@@ -307,6 +333,24 @@
       <span class="step-number" style="display:inline-flex; width:28px; height:28px; font-size:0.8rem; vertical-align:middle; margin-right:0.5rem; background:var(--primary); color:#fff; border-color:var(--primary);">4</span>
       Right Group Details
     </h3>
+
+    <!-- Quick Manual Section Select Dropdown -->
+    <div style="background: #f8fafc; padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+      <label for="right_quick_section_select" style="font-size: 0.85rem; font-weight: 800; color: #059669; display: block; margin-bottom: 0.35rem;">
+        <i class="fa-solid fa-hand-pointer"></i> Manual Section Selection Dropdown (Right Student):
+      </label>
+      <select id="right_quick_section_select" class="form-select" style="font-weight: 600;" onchange="applyRightSectionSelect(this.value)">
+        <option value="">-- Or Select Existing Registered Section --</option>
+        {% for sec in sections %}
+          <option value="{{ sec.college }}|{{ sec.program }}|{{ sec.branch }}|{{ sec.semester }}|{{ sec.section }}">
+            {{ sec.college }} - {{ sec.branch }} Sem {{ sec.semester }} (Sec {{ sec.section }}) — {{ sec.active_count }} Active Students
+          </option>
+        {% endfor %}
+      </select>
+      <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">
+        Selecting a section automatically populates the fields below and previews active students.
+      </div>
+    </div>
 
     <div class="form-row" id="right_section_row" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem;">
       <div class="form-group">
@@ -492,6 +536,43 @@
   function toggleRightModeUI(mode) {
     document.getElementById("right_dataset_inputs").style.display = mode === 'dataset' ? 'block' : 'none';
     document.getElementById("right_manual_inputs").style.display = mode === 'manual' ? 'block' : 'none';
+  }
+
+  function applyLeftSectionSelect(val) {
+    if (!val) return;
+    const parts = val.split("|");
+    if (parts.length >= 5) {
+      document.getElementById("left_college").value = parts[0];
+      document.getElementById("left_program").value = parts[1];
+      document.getElementById("left_branch").value = parts[2];
+      document.getElementById("left_semester").value = parts[3];
+      document.getElementById("left_section").value = parts[4];
+      loadLeftDatasetPreview();
+    }
+  }
+
+  function applyRightSectionSelect(val) {
+    if (!val) return;
+    const parts = val.split("|");
+    if (parts.length >= 5) {
+      document.getElementById("right_college").value = parts[0];
+      document.getElementById("right_program").value = parts[1];
+      document.getElementById("right_branch").value = parts[2];
+      document.getElementById("right_semester").value = parts[3];
+      document.getElementById("right_section").value = parts[4];
+      loadRightDatasetPreview();
+    }
+  }
+
+  function fetchSectionRoomOeBreakdownFromSelect(val) {
+    if (!val) return;
+    const parts = val.split("|");
+    if (parts.length >= 3) {
+      document.getElementById("left_branch").value = parts[0];
+      document.getElementById("left_semester").value = parts[1];
+      document.getElementById("left_section").value = parts[2];
+      fetchSectionRoomOeBreakdown();
+    }
   }
 
   function setLeftDatasetCount(val) {
